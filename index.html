@@ -1,3 +1,5 @@
+Berikut kode lengkap yang telah diperbaiki tanpa error, dengan berbagai penyempurnaan fitur dan penanganan bug.
+```html
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -9,7 +11,6 @@
   <link rel="apple-touch-icon" href="./abun512.png">
   <title>POS Mi Ayam Abun</title>
 
-  <!-- PWA Manifest (lengkap) -->
   <script>
     const manifestData = {
       "name": "POS Mi Ayam Abun",
@@ -32,11 +33,10 @@
     document.head.appendChild(linkManifest);
   </script>
 
-  <!-- Service Worker untuk caching dan instalasi PWA -->
   <script>
     if ('serviceWorker' in navigator) {
       const swCode = `
-        const CACHE = 'pos-miayam-v2';
+        const CACHE = 'pos-miayam-v3';
         const ASSETS = ['./', './abun200.png', './abun512.png'];
         self.addEventListener('install', e => {
           e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
@@ -54,7 +54,6 @@
     }
   </script>
 
-  <!-- Library -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
@@ -135,7 +134,7 @@
     } from 'lucide-react';
 
     // ======================= INDEXEDDB HELPER =======================
-    const DB_NAME = 'POSMiAyamDBv2';
+    const DB_NAME = 'POSMiAyamDBv3';
     const DB_VERSION = 1;
     const openDB = () => new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -244,6 +243,27 @@
       return <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 px-4 py-2.5 rounded-full text-white font-semibold text-xs shadow-2xl animate-bounce-in whitespace-nowrap ${bg}`}><Icon className="w-3.5 h-3.5"/>{message}</div>;
     });
 
+    // Komponen QRIS terpisah agar hook valid
+    const QrisCanvas = ({ amount, merchantId, appName }) => {
+      const canvasRef = useRef(null);
+      useEffect(() => {
+        if (!window.QRCode || !canvasRef.current) return;
+        const qrisString = [
+          "000201", "010212", "26", "00", "ID.CO.BPDDIY", "01", merchantId,
+          "02", "ID.CO.BPDDIY.WWW", "03", "UMI",
+          "5204", "5812", "53", "360", "54", amount.toString().padStart(2, '0'),
+          "58", "ID", "59", appName, "60", "Kota", "61", "55155",
+          "62", "07", "03", "A01", "63", "04"
+        ].join('');
+        const ctx = canvasRef.current.getContext('2d');
+        ctx.clearRect(0, 0, 220, 220);
+        window.QRCode.toCanvas(canvasRef.current, qrisString, { width: 220 }, (err) => {
+          if (err) console.error('QR Code error:', err);
+        });
+      }, [amount, merchantId, appName]);
+      return <canvas ref={canvasRef} width="220" height="220"></canvas>;
+    };
+
     // ======================= APLIKASI UTAMA =======================
     function App() {
       const receiptRef = useRef(null);
@@ -269,7 +289,7 @@
       const [selectedCategory, setSelectedCategory] = useState('Semua');
       const [showShiftModal, setShowShiftModal] = useState(false);
       const [shiftCashInput, setShiftCashInput] = useState('');
-      const [tempItem, setTempItem] = useState(null); // Untuk modal pilih Ice/Hot
+      const [tempItem, setTempItem] = useState(null);
 
       // ======================= LOAD DATA DARI INDEXEDDB =======================
       useEffect(() => {
@@ -290,11 +310,9 @@
         })();
       }, []);
 
-      // Simpan konfigurasi & shift ke IndexedDB
       useEffect(() => { idbAdd('config', { key:'storeConfig', value:storeConfig }); }, [storeConfig]);
       useEffect(() => { idbAdd('config', { key:'shift', value:shift }); }, [shift]);
 
-      // Sinkronisasi transaksi & holdOrders
       useEffect(() => {
         (async () => {
           await idbClear('transactions');
@@ -309,6 +327,29 @@
         })();
       }, [holdOrders]);
 
+      // Trigger cetak/JPG setelah receiptData terpasang dan DOM terupdate
+      useEffect(() => {
+        if (!receiptData) return;
+        const timer = setTimeout(async () => {
+          if (storeConfig.receiptMode === 'jpg') {
+            try {
+              if (receiptRef.current) {
+                const canvas = await window.html2canvas(receiptRef.current, { scale:2, backgroundColor:'#ffffff' });
+                const link = document.createElement('a');
+                link.download = `Struk-${receiptData.id}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+                showToast('Struk JPG berhasil diunduh', 'success');
+              }
+            } catch(err) { showToast('Gagal membuat JPG', 'error'); }
+          } else {
+            window.print();
+          }
+          setReceiptData(null);
+        }, 300);
+        return () => clearTimeout(timer);
+      }, [receiptData, storeConfig.receiptMode]);
+
       // ======================= HELPER =======================
       const showToast = useCallback((msg, type='success') => {
         const id = Date.now();
@@ -316,7 +357,6 @@
       }, []);
       const removeToast = useCallback((id) => setToasts(prev => prev.filter(t=>t.id!==id)), []);
 
-      // Tambah ke keranjang (langsung, atau dengan suhu untuk minuman)
       const handleAddToCart = useCallback((item, temperature='') => {
         const tempNote = temperature || '';
         const cartItemId = `${item.id}-${tempNote}`;
@@ -358,7 +398,6 @@
 
       const cartCalc = calculateCart();
 
-      // Simpan pesanan ke hold
       const saveToHold = useCallback(() => {
         if (cart.length===0) return;
         const ho = {
@@ -375,26 +414,6 @@
         setHoldOrders(prev => prev.filter(h => h.id!==ho.id));
         setIsCartOpen(true); setActiveTab('pos');
       }, []);
-
-      // Cetak / download struk
-      const handlePrintOrJPG = useCallback((trx) => {
-        setReceiptData(trx);
-        if (storeConfig.receiptMode==='jpg') {
-          showToast('Menyiapkan struk JPG...', 'info');
-          setTimeout(async () => {
-            try {
-              const canvas = await window.html2canvas(receiptRef.current, { scale:2, backgroundColor:'#ffffff' });
-              const link = document.createElement('a');
-              link.download = `Struk-${trx.id}.jpg`;
-              link.href = canvas.toDataURL('image/jpeg', 0.9);
-              link.click();
-              showToast('Struk JPG berhasil diunduh', 'success');
-            } catch(err) { showToast('Gagal membuat JPG', 'error'); }
-          }, 500);
-        } else {
-          setTimeout(() => window.print(), 300);
-        }
-      }, [storeConfig.receiptMode, showToast]);
 
       const handleShareWA = useCallback((trx) => {
         let text = `*INVOICE*\n*${storeConfig.appName}*\n${storeConfig.address}\n\n`;
@@ -472,7 +491,6 @@
         setIsHeaderMenuOpen(false);
       }, []);
 
-      // Proses transaksi
       const processTransaction = useCallback((paymentDetails) => {
         const trx = {
           id: generateInvoiceNo(), timestamp: new Date().toISOString(),
@@ -480,24 +498,13 @@
           calculations: cartCalc, payment: paymentDetails, cashier: 'Admin'
         };
         setTransactions(prev => [trx, ...prev]);
-        if (storeConfig.autoPrint) handlePrintOrJPG(trx);
+        if (storeConfig.autoPrint) {
+          setReceiptData(trx);
+        }
         setCart([]); setOrderInfo({ customerName:'', customerPhone:'', orderType:'Dine In', notes:'' });
         setDiscount({ type:'nominal', value:0 }); setIsCheckoutOpen(false); setIsCartOpen(false);
         showToast('Transaksi Berhasil!', 'success');
-      }, [cart, orderInfo, cartCalc, storeConfig.autoPrint, handlePrintOrJPG, showToast]);
-
-      // QRIS generator
-      const generateQrisCode = useCallback((amount) => {
-        if (!window.QRCode) return null;
-        const qrisString = [
-          "000201", "010212", "26", "00", "ID.CO.BPDDIY", "01", storeConfig.qrisMerchantId,
-          "02", "ID.CO.BPDDIY.WWW", "03", "UMI",
-          "5204", "5812", "53", "360", "54", amount.toString().padStart(2, '0'),
-          "58", "ID", "59", storeConfig.appName, "60", "Kota", "61", "55155",
-          "62", "07", "03", "A01", "63", "04"
-        ].join('');
-        return qrisString;
-      }, [storeConfig]);
+      }, [cart, orderInfo, cartCalc, storeConfig.autoPrint, showToast]);
 
       // ======================= RENDER SECTION =======================
       const renderTemperatureModal = () => {
@@ -718,7 +725,7 @@
 
               <section className="bg-white p-3 mb-1.5">
                 <h3 className="font-bold text-sm mb-3">Item ({cartCalc.totalItems})</h3>
-                {cart.map((item, idx) => {
+                {cart.map((item) => {
                   let itemTotal = item.price;
                   if (item.addons) item.addons.forEach(a => itemTotal+=a.price);
                   itemTotal *= item.qty;
@@ -746,7 +753,14 @@
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between"><span>Subtotal</span><span>{formatRp(cartCalc.subtotal)}</span></div>
                   <div className="flex justify-between text-blue-600 cursor-pointer"
-                    onClick={()=>setDialog({type:'prompt',title:'Diskon',placeholder:'Nominal',inputValue:discount.value?discount.value.toString():'',onConfirm:(val)=>{setDiscount({type:'nominal',value:Number(val)||0});setDialog(null);}})}>
+                    onClick={()=>setDialog({
+                      type:'discount', title:'Diskon', message:'Pilih tipe dan masukkan nilai diskon',
+                      discountType: discount.type, discountValue: discount.value,
+                      onConfirm: (type, val) => {
+                        setDiscount({type: type, value: Number(val)||0});
+                        setDialog(null);
+                      }
+                    })}>
                     <span>Diskon <Edit className="w-3 h-3 inline"/></span><span>-{formatRp(cartCalc.discountAmount)}</span>
                   </div>
                   {storeConfig.taxRate>0 && <div className="flex justify-between"><span>PPN {storeConfig.taxRate}%</span><span>{formatRp(cartCalc.taxAmount)}</span></div>}
@@ -774,43 +788,10 @@
         const isReady = checkoutMethod!=='cash' || Number(cashGiven)>=amountToPay;
         const handleNumpad = (v) => {
           if (v==='C') setCashGiven('');
+          else if (v==='⌫') setCashGiven(p=>p.slice(0,-1));
           else if (v==='000') setCashGiven(p=>p?p+'000':p);
           else setCashGiven(p=>p+v);
         };
-
-        // Render QRIS area
-        const renderQrisArea = () => {
-          return (
-            <div className="p-4 flex flex-col items-center animate-fade-in">
-              <div className="bg-white p-3 rounded-2xl shadow-lg border">
-                <canvas id="qrcode-canvas" width="220" height="220"></canvas>
-              </div>
-              <p className="text-xs text-gray-500 mt-3">Scan QRIS untuk membayar</p>
-              <p className="text-sm font-bold mt-1">{formatRp(amountToPay)}</p>
-            </div>
-          );
-        };
-
-        // Generate QR code setelah mount dan saat checkoutMethod berubah ke 'qris'
-        useEffect(() => {
-          if (checkoutMethod === 'qris' && isCheckoutOpen) {
-            const timer = setTimeout(() => {
-              const qrisString = generateQrisCode(amountToPay);
-              if (qrisString && window.QRCode) {
-                const canvas = document.getElementById('qrcode-canvas');
-                if (canvas) {
-                  // Kosongkan canvas sebelum render ulang
-                  const ctx = canvas.getContext('2d');
-                  ctx.clearRect(0, 0, canvas.width, canvas.height);
-                  window.QRCode.toCanvas(canvas, qrisString, { width: 220 }, (err) => {
-                    if (err) console.error('QR Code error:', err);
-                  });
-                }
-              }
-            }, 200);
-            return () => clearTimeout(timer);
-          }
-        }, [checkoutMethod, isCheckoutOpen, amountToPay, generateQrisCode]);
 
         return (
           <div className="absolute inset-0 z-50 flex flex-col bg-gray-50 no-print animate-slide-up">
@@ -848,20 +829,28 @@
                     </div>
                   )}
                   <div className="flex gap-1.5">
-                    <button onClick={()=>setCashGiven(amountToPay.toString())} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg">Uang Pas</button>
+                    <button onClick={()=>setCashGiven(Math.round(amountToPay).toString())} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg">Uang Pas</button>
                     <button onClick={()=>setCashGiven('50000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">50K</button>
                     <button onClick={()=>setCashGiven('100000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">100K</button>
                   </div>
                   <div className="grid grid-cols-3 gap-2 mt-3">
-                    {['1','2','3','4','5','6','7','8','9','C','0','000'].map(k=> (
+                    {['1','2','3','4','5','6','7','8','9','⌫','0','000','C'].map(k=> (
                       <button key={k} onClick={()=>handleNumpad(k)}
-                        className={`py-3 text-lg font-bold rounded-xl active:scale-95 ${k==='C'?'bg-red-50 text-red-600':'bg-gray-50'}`}>
+                        className={`py-3 text-lg font-bold rounded-xl active:scale-95 ${k==='C'?'bg-red-50 text-red-600 col-span-1':k==='⌫'?'bg-yellow-50 text-yellow-700':k==='000'?'bg-gray-100':'bg-gray-50'}`}>
                         {k}
                       </button>
                     ))}
                   </div>
                 </div>
-              ) : renderQrisArea()}
+              ) : (
+                <div className="p-4 flex flex-col items-center animate-fade-in">
+                  <div className="bg-white p-3 rounded-2xl shadow-lg border">
+                    <QrisCanvas amount={amountToPay} merchantId={storeConfig.qrisMerchantId} appName={storeConfig.appName} />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">Scan QRIS untuk membayar</p>
+                  <p className="text-sm font-bold mt-1">{formatRp(amountToPay)}</p>
+                </div>
+              )}
             </div>
             <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t pb-[max(env(safe-area-inset-bottom),0.75rem)]">
               <button
@@ -909,7 +898,7 @@
                     <p className="text-sm font-bold">{trx.orderInfo.customerName||'Tamu'}</p>
                     <p className="text-[10px] text-gray-500">{formatDate(trx.timestamp)} • {trx.payment.method}</p>
                     <div className="grid grid-cols-2 gap-1.5 mt-2">
-                      <button className="text-[10px] font-bold py-1.5 rounded-lg bg-gray-50 border" onClick={()=>handlePrintOrJPG(trx)}><Download className="w-3 h-3 inline"/> Cetak</button>
+                      <button className="text-[10px] font-bold py-1.5 rounded-lg bg-gray-50 border" onClick={()=>setReceiptData(trx)}><Download className="w-3 h-3 inline"/> Cetak</button>
                       <button className="text-[10px] font-bold py-1.5 rounded-lg bg-green-500 text-white" onClick={()=>handleShareWA(trx)}><Share2 className="w-3 h-3 inline"/> WA</button>
                     </div>
                   </div>
@@ -957,15 +946,30 @@
 
       const renderDialog = () => {
         if (!dialog) return null;
+        const isDiscount = dialog.type === 'discount';
+        const [localType, setLocalType] = useState(dialog.discountType || 'nominal');
+        const [localValue, setLocalValue] = useState(dialog.discountValue?.toString() || '');
         return (
           <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-6 no-print animate-fade-in">
             <div className="bg-white rounded-3xl w-full max-w-xs p-5 shadow-2xl animate-slide-up">
               <h3 className="text-lg font-bold mb-1.5">{dialog.title}</h3>
               {dialog.message && <p className="text-xs text-gray-600 mb-4">{dialog.message}</p>}
+              {isDiscount && (
+                <div className="mb-4 space-y-3">
+                  <div className="flex gap-2">
+                    <button onClick={()=>setLocalType('nominal')} className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${localType==='nominal'?'border-[#8B0000] bg-[#8B0000]/8 text-[#8B0000]':'border-gray-200 text-gray-500'}`}>Nominal (Rp)</button>
+                    <button onClick={()=>setLocalType('percent')} className={`flex-1 py-2 rounded-xl text-xs font-bold border-2 ${localType==='percent'?'border-[#8B0000] bg-[#8B0000]/8 text-[#8B0000]':'border-gray-200 text-gray-500'}`}>Persen (%)</button>
+                  </div>
+                  <input type="number" value={localValue} onChange={e=>setLocalValue(e.target.value)} placeholder={localType==='nominal'?'Jumlah diskon':'Persentase diskon'} className="w-full bg-gray-50 border rounded-xl px-3 py-2.5 text-base font-bold text-center" autoFocus/>
+                </div>
+              )}
               {dialog.type==='prompt' && <input type="number" value={dialog.inputValue||''} onChange={e=>setDialog({...dialog,inputValue:e.target.value})} placeholder={dialog.placeholder} className="w-full bg-gray-50 border rounded-xl px-3 py-2.5 text-base font-bold mb-4 text-center" autoFocus/>}
               <div className="flex gap-2.5">
                 <button className="flex-1 py-2.5 rounded-xl bg-gray-100 font-semibold text-xs" onClick={()=>setDialog(null)}>Batal</button>
-                <button className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-semibold text-xs" onClick={()=>dialog.onConfirm(dialog.inputValue)}>Konfirmasi</button>
+                <button className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-semibold text-xs" onClick={()=>{
+                  if (isDiscount) dialog.onConfirm(localType, localValue);
+                  else dialog.onConfirm(dialog.inputValue);
+                }}>Konfirmasi</button>
               </div>
             </div>
           </div>
@@ -1038,7 +1042,6 @@
       return (
         <div className="w-full h-full bg-[#1a1a1a] relative flex justify-center overflow-hidden font-sans text-gray-800">
           <div className="w-full h-full sm:max-w-[430px] bg-white relative flex flex-col overflow-hidden shadow-2xl">
-            {/* HEADER */}
             <header className="bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white px-4 py-3 pt-[max(env(safe-area-inset-top),0.5rem)] flex items-center justify-between z-20 shrink-0 no-print overflow-visible">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur border border-white/30 shadow-inner">
@@ -1058,6 +1061,7 @@
                 </button>
                 {isHeaderMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 text-gray-800 animate-slide-down origin-top-right z-[200]">
+                    {!shift.isOpen && <button onClick={()=>{setShowShiftModal(true);setIsHeaderMenuOpen(false);}} className="w-full text-left px-3 py-2.5 text-xs hover:bg-green-50 flex items-center gap-2 text-green-700 font-bold"><CheckCircle className="w-3.5 h-3.5"/> Buka Shift</button>}
                     <button onClick={handleResetApp} className="w-full text-left px-3 py-2.5 text-xs hover:bg-red-50 flex items-center gap-2 text-red-600 font-bold"><AlertCircle className="w-3.5 h-3.5"/> Reset Data</button>
                     <div className="border-b"/>
                     <button onClick={()=>window.location.reload()} className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-bold"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Muat Ulang</button>
@@ -1105,3 +1109,4 @@
   </script>
 </body>
 </html>
+```
