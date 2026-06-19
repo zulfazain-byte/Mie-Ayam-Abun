@@ -13,7 +13,7 @@
       "short_name": "POS Abun",
       "start_url": window.location.href,
       "display": "standalone",
-      "background_color": "#F9F6F0",
+      "background_color": "#9A1C1F",
       "theme_color": "#9A1C1F",
       "icons": [{
         "src": "https://cdn-icons-png.flaticon.com/512/3081/3081367.png",
@@ -152,9 +152,8 @@
       useEffect(() => { const timer = setTimeout(onClose, 3000); return () => clearTimeout(timer); }, [onClose]);
       const bg = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
       const Icon = type === 'success' ? CheckCircle : type === 'error' ? AlertCircle : Info;
-      // Gunakan "absolute" bukan "fixed" agar terkunci di dalam kontainer HP (desktop view friendly)
       return (
-        <div className={`absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-3 rounded-full text-white font-medium text-sm shadow-xl transition-all animate-bounce-in whitespace-nowrap ${bg}`}>
+        <div className={`absolute top-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-full text-white font-medium text-sm shadow-xl transition-all animate-toast whitespace-nowrap ${bg}`}>
           <Icon className="w-4 h-4" />{message}
         </div>
       );
@@ -182,6 +181,9 @@
       const [toasts, setToasts] = useState([]);
       const [dialog, setDialog] = useState(null);
       const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+      
+      // --- STATE UNTUK SPLASH SCREEN (ANIMASI AWAL) ---
+      const [splashState, setSplashState] = useState('visible'); // 'visible' | 'fading' | 'hidden'
 
       // --- LOCAL STORAGE STATE ---
       const [storeConfig, setStoreConfig] = useState(() => {
@@ -196,7 +198,6 @@
         const saved = localStorage.getItem('pos_hold');
         return saved ? JSON.parse(saved) : [];
       });
-
       const [shift, setShift] = useState(() => {
         const saved = localStorage.getItem('pos_shift');
         return saved ? JSON.parse(saved) : { isOpen: false, startTime: null, startCash: 0 };
@@ -210,7 +211,7 @@
         return saved ? JSON.parse(saved) : { customerName: '', customerPhone: '', orderType: 'Dine In', tableNumber: '' };
       });
 
-      // Synchronize with LocalStorage
+      // Sinkronisasi data ke memori browser (LocalStorage)
       useEffect(() => { localStorage.setItem('pos_config', JSON.stringify(storeConfig)); }, [storeConfig]);
       useEffect(() => { localStorage.setItem('pos_transactions', JSON.stringify(transactions)); }, [transactions]);
       useEffect(() => { localStorage.setItem('pos_hold', JSON.stringify(holdOrders)); }, [holdOrders]);
@@ -218,11 +219,7 @@
       useEffect(() => { localStorage.setItem('pos_cart', JSON.stringify(cart)); }, [cart]);
       useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
 
-      const [showShiftModal, setShowShiftModal] = useState(false);
-      const [shiftCashInput, setShiftCashInput] = useState('');
-
       const [discount, setDiscount] = useState({ type: 'nominal', value: 0 });
-      
       const [isCartOpen, setIsCartOpen] = useState(false);
       const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
       const [selectedAddons, setSelectedAddons] = useState([]);
@@ -235,6 +232,16 @@
 
       const [searchQuery, setSearchQuery] = useState('');
       const [selectedCategory, setSelectedCategory] = useState('Semua');
+
+      useEffect(() => {
+        document.body.style.overflowX = 'hidden';
+        document.body.classList.add('flex', 'justify-center');
+        
+        // Timer Logika Splash Screen (Muncul 2.5 Detik)
+        const t1 = setTimeout(() => setSplashState('fading'), 2000);
+        const t2 = setTimeout(() => setSplashState('hidden'), 2500);
+        return () => { clearTimeout(t1); clearTimeout(t2); };
+      }, []);
 
       const showToast = (message, type = 'success') => {
         const id = Date.now();
@@ -451,7 +458,56 @@
         showToast('Transaksi Berhasil!', 'success');
       };
 
+      const promptBukaShift = () => {
+        setDialog({
+          type: 'prompt',
+          title: 'Buka Shift Kasir',
+          message: 'Masukkan modal awal uang tunai di laci (Rp):',
+          placeholder: 'Contoh: 100000',
+          inputValue: '',
+          onConfirm: (val) => {
+            setShift({ isOpen: true, startTime: new Date(), startCash: Number(val) || 0 });
+            setDialog(null);
+            showToast('Shift Kasir Dibuka', 'success');
+          }
+        });
+      };
+
+      const promptTutupShift = () => {
+        setDialog({
+          type: 'confirm', 
+          title: 'Tutup Shift',
+          message: 'Anda yakin ingin menutup shift kasir saat ini?',
+          onConfirm: () => {
+            setShift({ isOpen: false, startTime: null, startCash: 0 });
+            setDialog(null);
+            showToast('Shift Kasir Ditutup', 'success');
+          }
+        });
+      };
+
       // ========================== RENDERS ========================== //
+      
+      const renderSplashScreen = () => {
+        if (splashState === 'hidden') return null;
+        return (
+          <div className={`absolute inset-0 z-[200] bg-[#9A1C1F] flex flex-col items-center justify-center transition-opacity duration-500 ${splashState === 'fading' ? 'opacity-0' : 'opacity-100'}`}>
+             <div className="flex flex-col items-center animate-pulse">
+                {/* UBAH GAMBAR DI SINI: Ganti 'src' dengan URL Gambar Logo Anda untuk Splash Screen */}
+                <img src="https://cdn-icons-png.flaticon.com/512/3081/3081367.png" alt="Splash Logo" className="w-32 h-32 brightness-0 invert mb-6 drop-shadow-lg" />
+                
+                <h1 className="text-3xl font-black text-white tracking-widest drop-shadow-md">{storeConfig.appName}</h1>
+                <p className="text-white/80 text-xs mt-2 tracking-widest">SISTEM KASIR PRO</p>
+                
+                <div className="mt-12 flex gap-3">
+                   <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce"></div>
+                   <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                   <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                </div>
+             </div>
+          </div>
+        );
+      };
 
       const renderDashboard = () => {
         const today = new Date().toDateString();
@@ -537,7 +593,7 @@
                   <div className="bg-orange-100 w-10 h-10 rounded-xl flex items-center justify-center text-orange-600 mb-3"><Clock className="w-5 h-5" /></div>
                   <p className="text-xs text-gray-500 font-medium">Status Shift</p>
                   <p className="font-bold text-gray-800">{shift.isOpen ? 'Buka' : 'Tutup'}</p>
-                  {!shift.isOpen && <Button variant="outline" className="mt-3 text-xs py-1.5 px-2" onClick={() => { setShowShiftModal(true); setShiftCashInput(''); }}>Buka Shift</Button>}
+                  {!shift.isOpen && <Button variant="outline" className="mt-3 text-xs py-1.5 px-2" onClick={promptBukaShift}>Buka Shift</Button>}
                 </div>
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                    <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 mb-3"><Save className="w-5 h-5" /></div>
@@ -609,7 +665,7 @@
 
             {cartCalculations.totalItems > 0 && (
               <div className="absolute bottom-[80px] left-0 right-0 px-4 z-20">
-                <button onClick={() => setIsCartOpen(true)} className="w-full bg-[#9A1C1F] text-white p-4 rounded-2xl shadow-xl shadow-[#9A1C1F]/30 flex items-center justify-between animate-bounce-in transition-transform active:scale-[0.98]">
+                <button onClick={() => setIsCartOpen(true)} className="w-full bg-[#9A1C1F] text-white p-4 rounded-2xl shadow-xl shadow-[#9A1C1F]/30 flex items-center justify-between animate-popup transition-transform active:scale-[0.98]">
                   <div className="flex items-center gap-3">
                     <div className="bg-white/20 px-3 py-1.5 rounded-xl font-bold text-sm">{cartCalculations.totalItems} Item</div>
                     <span className="font-medium text-sm">Lihat Keranjang</span>
@@ -738,16 +794,9 @@
                        </div>
                      </div>
                      
-                     <Button variant="danger" className="w-full mt-4" onClick={() => {
-                       setDialog({
-                         type: 'confirm', title: shift.isOpen ? 'Tutup Shift' : 'Buka Shift',
-                         message: shift.isOpen ? 'Anda yakin ingin menutup shift kasir saat ini?' : 'Silakan buka shift kasir di halaman Dashboard.',
-                         onConfirm: () => {
-                           if (shift.isOpen) { setShift({ isOpen: false, startTime: null, startCash: 0 }); showToast('Shift Kasir Ditutup', 'success'); } else { setActiveTab('dashboard'); }
-                           setDialog(null);
-                         }
-                       });
-                     }}>{shift.isOpen ? 'Tutup Shift Kasir' : 'Minta Buka Shift'}</Button>
+                     <Button variant={shift.isOpen ? "danger" : "primary"} className="w-full mt-4" onClick={() => {
+                        if (shift.isOpen) { promptTutupShift(); } else { promptBukaShift(); }
+                     }}>{shift.isOpen ? 'Tutup Shift Kasir' : 'Buka Shift Kasir'}</Button>
                   </div>
                </div>
                
@@ -766,7 +815,7 @@
         if (!dialog) return null;
         return (
           <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in">
-            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-bounce-in">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
               <h3 className="text-xl font-bold text-gray-800 mb-2">{dialog.title}</h3>
               {dialog.message && <p className="text-sm text-gray-600 mb-5 leading-relaxed">{dialog.message}</p>}
               {dialog.type === 'prompt' && <input type="number" value={dialog.inputValue || ''} onChange={(e) => setDialog({...dialog, inputValue: e.target.value})} placeholder={dialog.placeholder} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:border-[#9A1C1F] mb-5 text-center transition-colors" autoFocus />}
@@ -786,9 +835,9 @@
         let currentPrice = item.price + selectedAddons.reduce((s, a) => s + a.price, 0);
 
         return (
-          <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-            <div className="bg-white w-full rounded-t-3xl max-h-[90vh] flex flex-col animate-slide-up">
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center relative"><h3 className="font-bold text-lg">{item.name}</h3><button onClick={() => setSelectedItemForAddon(null)} className="p-2 bg-gray-100 rounded-full text-gray-600 active:scale-95 transition-all"><X className="w-5 h-5" /></button></div>
+          <div className="absolute inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+            <div className="bg-white w-full max-w-sm rounded-3xl max-h-[90vh] flex flex-col animate-popup shadow-2xl overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center relative bg-gray-50"><h3 className="font-bold text-lg">{item.name}</h3><button onClick={() => setSelectedItemForAddon(null)} className="p-2 bg-white rounded-full shadow-sm text-gray-600 active:scale-95 transition-all"><X className="w-5 h-5" /></button></div>
               <div className="p-4 overflow-y-auto flex-1 space-y-6">
                 {item.addons && (
                   <div className="animate-fade-in">
@@ -808,7 +857,7 @@
                 )}
                 <div className="animate-fade-in"><p className="font-bold text-sm text-gray-800 mb-2">Catatan Khusus</p><textarea value={addonNotes} onChange={(e) => setAddonNotes(e.target.value)} placeholder="Contoh: Pedas, jangan pakai seledri..." className="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:border-[#9A1C1F] focus:ring-1 focus:ring-[#9A1C1F] resize-none h-24 transition-colors"></textarea></div>
               </div>
-              <div className="p-4 border-t border-gray-100 bg-white pb-[max(env(safe-area-inset-bottom),1rem)]"><Button className="w-full shadow-[#9A1C1F]/40" onClick={() => handleAddToCart(item, selectedAddons, addonNotes)}>Tambah ke Keranjang • {formatRp(currentPrice)}</Button></div>
+              <div className="p-4 border-t border-gray-100 bg-white"><Button className="w-full shadow-[#9A1C1F]/40" onClick={() => handleAddToCart(item, selectedAddons, addonNotes)}>Tambah ke Keranjang • {formatRp(currentPrice)}</Button></div>
             </div>
           </div>
         );
@@ -818,12 +867,12 @@
         if (!isCartOpen) return null;
         return (
           <div className="absolute inset-0 z-40 flex flex-col bg-gray-50 animate-slide-up print:hidden">
-            <div className="bg-white px-4 py-4 flex items-center justify-between border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)] sticky top-0 z-10">
+            <div className="bg-white px-4 py-4 flex items-center justify-between border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)] shrink-0">
               <div className="flex items-center gap-3"><button onClick={() => setIsCartOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button><h2 className="font-bold text-lg text-gray-800">Detail Pesanan</h2></div>
               <button onClick={clearCart} className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 px-2 py-1.5 rounded-lg active:scale-95 transition-all hover:bg-red-100"><Trash2 className="w-4 h-4" /> Kosongkan</button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pb-32">
+            <div className="flex-1 overflow-y-auto pb-24">
               <section className="bg-white p-4 mb-2 border-b border-gray-100 shadow-sm space-y-4">
                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                   {ORDER_TYPES.map(type => (
@@ -880,7 +929,7 @@
               )}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 shadow-[0_-10px_20px_-5px_rgba(0,0,0,0.1)] pb-[max(env(safe-area-inset-bottom),1rem)] flex gap-3 z-20">
+            <div className="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 pb-[max(env(safe-area-inset-bottom),1rem)] flex gap-3 z-20">
                <Button variant="secondary" className="flex-1" onClick={saveToHold} disabled={cart.length === 0}><Save className="w-5 h-5" /> Simpan</Button>
                <Button variant="primary" className="flex-[2] shadow-[#9A1C1F]/40" onClick={() => { setIsCheckoutOpen(true); setCheckoutMethod('cash'); setCashGiven(''); }} disabled={cart.length === 0}>Bayar Sekarang</Button>
             </div>
@@ -899,11 +948,11 @@
 
         return (
           <div className="absolute inset-0 z-50 flex flex-col bg-gray-50 animate-slide-up print:hidden">
-            <div className="bg-white px-4 py-4 flex items-center gap-3 border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)]"><button onClick={() => setIsCheckoutOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button><h2 className="font-bold text-lg text-gray-800">Pembayaran</h2></div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="bg-white px-4 py-4 flex items-center gap-3 border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)] shrink-0"><button onClick={() => setIsCheckoutOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button><h2 className="font-bold text-lg text-gray-800">Pembayaran</h2></div>
+            <div className="flex-1 overflow-y-auto pb-24">
               <div className="bg-[#9A1C1F] text-white p-6 text-center shadow-inner"><p className="text-sm opacity-80 mb-1">Total Tagihan</p><p className="text-4xl font-black tracking-tight">{formatRp(amountToPay)}</p></div>
               <div className="p-4 bg-white border-b border-gray-100">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 block">Metode Pembayaran</label>
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 block text-center">Metode Pembayaran</label>
                 <div className="grid grid-cols-3 gap-3">
                   {PAYMENT_METHODS.map(m => (
                     <button key={m.id} onClick={() => { setCheckoutMethod(m.id); setCashGiven(''); }} className={`py-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all duration-200 active:scale-95 ${checkoutMethod === m.id ? 'border-[#9A1C1F] bg-[#9A1C1F]/10 text-[#9A1C1F] shadow-sm' : 'border-gray-100 text-gray-500 bg-gray-50 hover:bg-gray-100'}`}>
@@ -914,29 +963,29 @@
               </div>
 
               {checkoutMethod === 'cash' && (
-                <div className="p-4 bg-white space-y-4 animate-fade-in">
-                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-right transition-colors"><p className="text-xs font-bold text-gray-400 mb-1">Uang Diterima</p><p className={`text-2xl font-bold ${cashGiven ? 'text-gray-800' : 'text-gray-300'}`}>{cashGiven ? formatRp(Number(cashGiven)) : 'Rp 0'}</p></div>
-                  {Number(cashGiven) > 0 && <div className={`p-4 rounded-xl flex justify-between items-center border transition-all animate-slide-up ${change >= 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}><span className="font-bold text-sm">Kembalian</span><span className="font-black text-lg">{change >= 0 ? formatRp(change) : 'Kurang ' + formatRp(Math.abs(change))}</span></div>}
-                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <div className="p-4 bg-white space-y-4 animate-fade-in flex flex-col">
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center transition-colors"><p className="text-xs font-bold text-gray-400 mb-1">Uang Diterima</p><p className={`text-3xl font-black ${cashGiven ? 'text-[#9A1C1F]' : 'text-gray-300'}`}>{cashGiven ? formatRp(Number(cashGiven)) : 'Rp 0'}</p></div>
+                  {Number(cashGiven) > 0 && <div className={`p-4 rounded-xl flex flex-col items-center justify-center text-center border transition-all animate-slide-up ${change >= 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}><span className="font-bold text-xs mb-1">Kembalian</span><span className="font-black text-xl">{change >= 0 ? formatRp(change) : 'Kurang ' + formatRp(Math.abs(change))}</span></div>}
+                  <div className="flex justify-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
                     <button onClick={() => setCashGiven(amountToPay.toString())} className="px-4 py-2 bg-blue-50 text-blue-700 font-bold text-sm rounded-xl border border-blue-200 whitespace-nowrap active:scale-95 transition-all">Uang Pas</button>
                     <button onClick={() => setCashGiven('50000')} className="px-4 py-2 bg-gray-100 text-gray-700 font-bold text-sm rounded-xl border border-gray-200 active:scale-95 transition-all">50K</button>
                     <button onClick={() => setCashGiven('100000')} className="px-4 py-2 bg-gray-100 text-gray-700 font-bold text-sm rounded-xl border border-gray-200 active:scale-95 transition-all">100K</button>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 mt-4">
+                  <div className="grid grid-cols-3 gap-2 mt-2">
                     {['1','2','3','4','5','6','7','8','9','C','0','000'].map(key => <button key={key} onClick={() => handleNumpad(key)} className={`py-4 text-xl font-bold rounded-2xl active:scale-95 transition-transform ${key === 'C' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-50 text-gray-800 border border-gray-100 hover:bg-gray-100 shadow-sm'}`}>{key}</button>)}
                   </div>
                 </div>
               )}
               
               {checkoutMethod !== 'cash' && (
-                 <div className="p-8 text-center bg-white h-full flex flex-col justify-center animate-fade-in">
-                    <div className="w-32 h-32 bg-gray-100 rounded-2xl mx-auto flex items-center justify-center border-2 border-dashed border-gray-300 mb-4"><QrCode className="w-12 h-12 text-gray-400" /></div>
-                    <p className="text-gray-500 text-sm">Pastikan pelanggan telah mentransfer dana sebesar <b>{formatRp(amountToPay)}</b> sebelum memproses transaksi.</p>
+                 <div className="p-8 text-center bg-white h-[350px] flex flex-col items-center justify-center animate-fade-in">
+                    <div className="w-32 h-32 bg-gray-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-gray-300 mb-4"><QrCode className="w-12 h-12 text-gray-400" /></div>
+                    <p className="text-gray-500 text-sm max-w-[250px]">Pastikan pelanggan telah mentransfer dana sebesar <b className="text-gray-800">{formatRp(amountToPay)}</b> sebelum memproses transaksi.</p>
                  </div>
               )}
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-200 pb-[max(env(safe-area-inset-bottom),1rem)]">
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 pb-[max(env(safe-area-inset-bottom),1rem)] z-20">
               <Button variant="primary" className="w-full text-lg py-4 shadow-[#9A1C1F]/40" disabled={!isReadyToPay} onClick={() => processTransaction({ method: checkoutMethod, cashGiven: checkoutMethod === 'cash' ? Number(cashGiven) : amountToPay, change: checkoutMethod === 'cash' ? change : 0 })}>
                 Selesaikan Transaksi
               </Button>
@@ -1075,6 +1124,10 @@
       return (
         <div className="w-full h-[100dvh] sm:h-screen bg-[#333] relative flex justify-center overflow-hidden font-sans text-gray-800">
           <div className="w-full sm:max-w-md bg-white h-full relative shadow-2xl flex flex-col overflow-hidden">
+            
+            {/* SPLASH SCREEN (LAYAR AWAL ANIMASI) */}
+            {renderSplashScreen()}
+
             <header className="bg-[#9A1C1F] text-[#F9F6F0] p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative overflow-visible transition-all duration-300">
               <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
               <div className="flex items-center gap-3 relative z-10">
@@ -1127,13 +1180,24 @@
           </div>
           {renderReceiptElement()}
           <style dangerouslySetInnerHTML={{__html: `
+            /* Animasi Fade In Normal */
             @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-            @keyframes bounceIn { 0% { transform: scale(0.9) translateX(-50%); opacity: 0; } 50% { transform: scale(1.05) translateX(-50%); } 100% { transform: scale(1) translateX(-50%); opacity: 1; } }
-            @keyframes shine { to { background-position: 200% center; } }
             .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-            .animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            .animate-bounce-in { animation: bounceIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; left: 50%; }
+
+            /* Animasi Slide Up untuk Konten/Modal bawah */
+            @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+            /* Animasi Pop-Up Center (Buka Shift & Tambah Porsi) */
+            @keyframes popup { 0% { transform: scale(0.9); opacity: 0; } 50% { transform: scale(1.05); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+            .animate-popup { animation: popup 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+            /* Animasi Toast Notifikasi (Dari atas) */
+            @keyframes toastSlide { 0% { transform: translate(-50%, -20px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+            .animate-toast { animation: toastSlide 0.3s ease-out forwards; left: 50%; }
+
+            /* Animasi Kilauan Emas (Footer) */
+            @keyframes shine { to { background-position: 200% center; } }
             .animate-shine {
               background: linear-gradient(to right, #9A1C1F 20%, #ff7e5f 40%, #ff7e5f 60%, #9A1C1F 80%);
               background-size: 200% auto;
@@ -1141,8 +1205,10 @@
               -webkit-text-fill-color: transparent;
               animation: shine 3s linear infinite;
             }
+
             .scrollbar-hide::-webkit-scrollbar { display: none; }
             .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+            
             @media print { body { background: white !important; display: block !important; margin: 0; padding: 0; } html { width: 58mm; } }
           `}} />
         </div>
