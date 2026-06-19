@@ -6,12 +6,14 @@
   <meta name="theme-color" content="#8B0000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Mi Ayam Abun</title>
+  <title>Mi Ayam Abun POS</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
+  <!-- Tambahan untuk konfeti interaktif -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap" rel="stylesheet">
   <script type="importmap">
     {
@@ -24,6 +26,72 @@
     }
   </script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- PWA Manifest -->
+  <script>
+    const manifestJSON = {
+      "name": "Mi Ayam Abun POS",
+      "short_name": "POS Abun",
+      "start_url": ".",
+      "display": "standalone",
+      "background_color": "#F9F6F0",
+      "theme_color": "#8B0000",
+      "icons": [{
+        "src": "./abun512.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable"
+      }]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
+    document.write('<link rel="manifest" href="' + URL.createObjectURL(manifestBlob) + '">');
+    // Tambahkan apple-touch-icon untuk iOS
+    const appleIcon = document.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    appleIcon.href = './abun512.png';
+    document.head.appendChild(appleIcon);
+  </script>
+
+  <!-- Service Worker untuk Offline dan Caching -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        const swCode = `
+          const CACHE_NAME = 'pos-miayam-v2';
+          const urlsToCache = [
+            './',
+            './index.html',
+            './abun200.png',
+            './abun512.png',
+            // asset CDN yang dibutuhkan offline (opsional, akan dicache saat pertama kali dibuka)
+          ];
+
+          self.addEventListener('install', (event) => {
+            event.waitUntil(
+              caches.open(CACHE_NAME)
+                .then((cache) => cache.addAll(urlsToCache))
+                .then(() => self.skipWaiting())
+            );
+          });
+
+          self.addEventListener('activate', (event) => {
+            event.waitUntil(self.clients.claim());
+          });
+
+          self.addEventListener('fetch', (event) => {
+            event.respondWith(
+              caches.match(event.request)
+                .then((response) => response || fetch(event.request))
+            );
+          });
+        `;
+        const swBlob = new Blob([swCode], { type: 'application/javascript' });
+        navigator.serviceWorker.register(URL.createObjectURL(swBlob))
+          .then(() => console.log('✅ Service Worker terdaftar, aplikasi bisa diinstal dan offline.'))
+          .catch((err) => console.warn('Service Worker gagal:', err));
+      });
+    }
+  </script>
 
   <style>
     * {
@@ -71,6 +139,11 @@
       background-clip: text;
       animation: shine 3s linear infinite;
     }
+    /* efek ripple sederhana untuk tombol (opsional) */
+    button {
+      position: relative;
+      overflow: hidden;
+    }
     @media print {
       body { background: white !important; display: block !important; margin: 0; padding: 0; width: 58mm; }
       html { width: 58mm; }
@@ -85,33 +158,27 @@
     import React, { useState, useEffect, useRef, useCallback } from 'react';
     import { createRoot } from 'react-dom/client';
     import {
-      ShoppingBag, Printer, MessageCircle, Plus, Minus,
-      Trash2, X, Store, CreditCard, Banknote, QrCode,
-      Image as ImageIcon, History, Settings, Home, LayoutGrid,
-      ArrowLeft, MoreVertical, Edit, Search, CheckCircle,
-      AlertCircle, Clock, Utensils, Coffee, Calculator, Check,
-      Receipt, BarChart3, LogOut, Save, FileText, Info, Download,
-      Share2, FileSpreadsheet, TrendingUp, Database, UploadCloud, User
+      ShoppingBag, Plus, Minus, Trash2, X, Store, Banknote, QrCode,
+      History, Settings, Home, LayoutGrid, ArrowLeft, MoreVertical,
+      Edit, Search, CheckCircle, AlertCircle, Clock, Utensils, Coffee,
+      Check, Receipt, BarChart3, Save, Download, Share2, FileSpreadsheet,
+      TrendingUp, Database, UploadCloud
     } from 'lucide-react';
 
-    // ============================================================================
-    // INDEXEDDB WRAPPER (Offline Storage)
-    // ============================================================================
-    const DB_NAME = 'MiAyamAbunDB';
+    // ==================== INDEXEDDB ====================
+    const DB_NAME = 'POSMiAyamDB';
     const DB_VERSION = 1;
-    const openDB = () => {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-          const db = event.target.result;
-          if (!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', { keyPath: 'id' });
-          if (!db.objectStoreNames.contains('holdOrders')) db.createObjectStore('holdOrders', { keyPath: 'id' });
-          if (!db.objectStoreNames.contains('config')) db.createObjectStore('config', { keyPath: 'key' });
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    };
+    const openDB = () => new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('holdOrders')) db.createObjectStore('holdOrders', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('config')) db.createObjectStore('config', { keyPath: 'key' });
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
     const idbAdd = async (storeName, data) => {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -130,15 +197,6 @@
         request.onerror = () => reject(request.error);
       });
     };
-    const idbDelete = async (storeName, id) => {
-      const db = await openDB();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        tx.objectStore(storeName).delete(id);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    };
     const idbClear = async (storeName) => {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -149,37 +207,35 @@
       });
     };
 
-    // ============================================================================
-    // DATA
-    // ============================================================================
+    // ==================== DATA ====================
     const MENU_DATABASE = [
       { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: Utensils },
       { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: Utensils },
-      { id: 'b1', category: 'Minuman', name: 'Ice/Hot Teh Standar', price: 4000, icon: Coffee },
-      { id: 'b2', category: 'Minuman', name: 'Ice Teh Jumbo', price: 6000, icon: Coffee },
-      { id: 'b3', category: 'Minuman', name: 'Ice/Hot Jeruk', price: 6000, icon: Coffee },
-      { id: 'b4', category: 'Minuman', name: 'Ice Bunga Rosella', price: 6000, icon: Coffee },
-      { id: 'b5', category: 'Minuman', name: 'Ice Bunga Telang', price: 6000, icon: Coffee },
-      { id: 'b6', category: 'Minuman', name: 'Ice Bunga Telang + Nipis', price: 7000, icon: Coffee },
-      { id: 'b7', category: 'Minuman', name: 'Ice/Hot Americano', price: 6000, icon: Coffee },
-      { id: 'b8', category: 'Minuman', name: 'Ice Lemon Tea', price: 5000, icon: Coffee },
-      { id: 'b9', category: 'Minuman', name: 'Kopi Hitam', price: 5000, icon: Coffee },
-      { id: 'b10', category: 'Minuman', name: 'Ice/Hot Coffemix', price: 5000, icon: Coffee },
-      { id: 'b11', category: 'Minuman', name: 'Ice Teh Tarik', price: 6000, icon: Coffee },
-      { id: 'b12', category: 'Minuman', name: 'Ice Good Day Freeze', price: 6000, icon: Coffee },
-      { id: 'b13', category: 'Minuman', name: 'Ice/Hot Milo', price: 6000, icon: Coffee },
-      { id: 'b14', category: 'Minuman', name: 'Ice/Hot Milo + Kental', price: 7000, icon: Coffee },
+      // Minuman dengan opsi Ice / Hot
+      { id: 'b1', category: 'Minuman', name: 'Teh Standar', price: 4000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b2', category: 'Minuman', name: 'Teh Jumbo', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b3', category: 'Minuman', name: 'Jeruk', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b4', category: 'Minuman', name: 'Bunga Rosella', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b5', category: 'Minuman', name: 'Bunga Telang', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b6', category: 'Minuman', name: 'Bunga Telang + Nipis', price: 7000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b7', category: 'Minuman', name: 'Americano', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b8', category: 'Minuman', name: 'Lemon Tea', price: 5000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b9', category: 'Minuman', name: 'Kopi Hitam', price: 5000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b10', category: 'Minuman', name: 'Coffemix', price: 5000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b11', category: 'Minuman', name: 'Teh Tarik', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b12', category: 'Minuman', name: 'Good Day Freeze', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0}] }, // hanya ice
+      { id: 'b13', category: 'Minuman', name: 'Milo', price: 6000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
+      { id: 'b14', category: 'Minuman', name: 'Milo + Kental', price: 7000, icon: Coffee, addons: [{id:'ice',name:'Ice',price:0},{id:'hot',name:'Hot',price:0}] },
     ];
 
-    const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online'];
+    const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online (Ojol)'];
     const PAYMENT_METHODS = [
       { id: 'cash', name: 'Tunai', icon: Banknote },
-      { id: 'qris', name: 'QRIS', icon: QrCode },
-      { id: 'transfer', name: 'Transfer', icon: CreditCard }
+      { id: 'qris', name: 'QRIS', icon: QrCode }
     ];
 
     const DEFAULT_STORE_CONFIG = {
-      appName: 'MI AYAM ABUN',
+      appName: 'Mi Ayam Abun',
       instagram: '@miayamabun.id',
       address: 'Dusun IV Kalibagor, Kec.Kalibagor, Kab.Banyumas, Jawa Tengah 53191',
       phone: '085848791020',
@@ -187,15 +243,9 @@
       serviceCharge: 0,
       receiptMode: 'thermal',
       autoPrint: true,
-      logoUrl: '',
-      bankName: 'BCA',
-      bankAccount: '1234567890',
-      qrisMerchantId: '936000010000000001' // dummy QRIS merchant PAN
     };
 
-    // ============================================================================
-    // UTILITY
-    // ============================================================================
+    // ==================== UTILITY ====================
     const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
     const generateId = () => Math.random().toString(36).substr(2, 9);
     const generateInvoiceNo = () => {
@@ -204,11 +254,8 @@
     };
     const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-    // ============================================================================
-    // COMPONENTS
-    // ============================================================================
     const Button = React.memo(({ children, onClick, variant = 'primary', className = '', disabled = false, icon: Icon }) => {
-      const baseStyle = "flex items-center justify-center gap-1.5 font-semibold rounded-2xl transition-all duration-150 active:scale-[0.97] disabled:opacity-50 disabled:active:scale-100 overflow-hidden relative";
+      const baseStyle = "flex items-center justify-center gap-1.5 font-semibold rounded-2xl transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:active:scale-100 overflow-hidden";
       const variants = {
         primary: "bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white hover:from-[#6d0000] hover:to-[#8B0000] shadow-lg shadow-[#8B0000]/20 py-2.5 px-4 text-sm",
         secondary: "bg-[#8B0000]/8 text-[#8B0000] hover:bg-[#8B0000]/15 py-2.5 px-4 text-sm",
@@ -228,30 +275,16 @@
     const Toast = React.memo(({ message, type = 'success', onClose }) => {
       useEffect(() => { const timer = setTimeout(onClose, 2500); return () => clearTimeout(timer); }, [onClose]);
       const bg = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-      const Icon = type === 'success' ? CheckCircle : type === 'error' ? AlertCircle : Info;
+      const Icon = type === 'success' ? CheckCircle : type === 'error' ? AlertCircle : null;
       return (
         <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 px-4 py-2.5 rounded-full text-white font-semibold text-xs shadow-2xl animate-bounce-in whitespace-nowrap ${bg}`}>
-          <Icon className="w-3.5 h-3.5" />{message}
+          {Icon && <Icon className="w-3.5 h-3.5" />}
+          {message}
         </div>
       );
     });
 
-    const StrukLogo = ({ logoUrl }) => (
-      logoUrl ? <img src={logoUrl} className="w-12 h-12 object-contain mx-auto mb-1.5 rounded-xl" alt="logo" /> :
-      <svg viewBox="0 0 100 100" className="w-12 h-12 mx-auto mb-1.5" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 45 C10 75, 30 90, 50 90 C70 90, 90 75, 90 45 Z" fill="#000" stroke="#000" />
-        <path d="M10 45 L90 45" stroke="#000" strokeWidth="6"/>
-        <path d="M30 45 Q35 25, 50 25 T70 45" />
-        <path d="M40 45 Q45 15, 60 15 T80 45" />
-        <path d="M20 45 Q30 35, 40 45" />
-        <line x1="85" y1="10" x2="25" y2="45" strokeWidth="5" />
-        <line x1="95" y1="15" x2="35" y2="45" strokeWidth="5" />
-      </svg>
-    );
-
-    // ============================================================================
-    // MAIN APP
-    // ============================================================================
+    // ==================== MAIN APP ====================
     function App() {
       const receiptRef = useRef(null);
       const fileInputRef = useRef(null);
@@ -260,15 +293,14 @@
       const [dialog, setDialog] = useState(null);
       const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
 
-      // State dari IndexedDB (di-load saat mount)
       const [storeConfig, setStoreConfig] = useState(DEFAULT_STORE_CONFIG);
       const [transactions, setTransactions] = useState([]);
       const [holdOrders, setHoldOrders] = useState([]);
       const [shift, setShift] = useState({ isOpen: true, startTime: new Date().toISOString(), startCash: 0 });
       const [cart, setCart] = useState([]);
-      const [orderInfo, setOrderInfo] = useState({ customerName: '', customerPhone: '', orderType: 'Dine In', tableNumber: '' });
+      const [orderInfo, setOrderInfo] = useState({ customerName: '', customerPhone: '', orderType: 'Dine In', catatan: '' });
 
-      // Load initial data from IndexedDB
+      // Load from IndexedDB
       useEffect(() => {
         const loadData = async () => {
           try {
@@ -286,21 +318,15 @@
         loadData();
       }, []);
 
-      // Sync to IndexedDB on change
+      // Sync to IndexedDB
       useEffect(() => { idbAdd('config', { key: 'storeConfig', value: storeConfig }); }, [storeConfig]);
       useEffect(() => { idbAdd('config', { key: 'shift', value: shift }); }, [shift]);
       useEffect(() => {
-        const syncTx = async () => {
-          await idbClear('transactions');
-          for (let t of transactions) { await idbAdd('transactions', t); }
-        };
+        const syncTx = async () => { await idbClear('transactions'); for (let t of transactions) { await idbAdd('transactions', t); } };
         syncTx();
       }, [transactions]);
       useEffect(() => {
-        const syncH = async () => {
-          await idbClear('holdOrders');
-          for (let h of holdOrders) { await idbAdd('holdOrders', h); }
-        };
+        const syncH = async () => { await idbClear('holdOrders'); for (let h of holdOrders) { await idbAdd('holdOrders', h); } };
         syncH();
       }, [holdOrders]);
 
@@ -354,7 +380,7 @@
         let subtotal = 0;
         cart.forEach(item => {
           let itemPrice = item.price;
-          if (item.addons) item.addons.forEach(addon => itemPrice += addon.price);
+          if (item.addons) item.addons.forEach(a => itemPrice += (a.price || 0));
           subtotal += (itemPrice * item.qty);
         });
         let discountAmount = discount.type === 'percent' ? subtotal * (discount.value / 100) : discount.value;
@@ -376,7 +402,7 @@
         };
         setHoldOrders(prev => [holdOrder, ...prev]);
         setCart([]);
-        setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', tableNumber: '' });
+        setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', catatan: '' });
         setIsCartOpen(false);
         showToast('Pesanan disimpan');
       }, [cart, orderInfo, cartCalculations, showToast]);
@@ -417,7 +443,7 @@
         text += `--------------------------------\n`;
         trx.cart.forEach(item => {
           let itemTotal = item.price;
-          if (item.addons) item.addons.forEach(a => itemTotal += a.price);
+          if (item.addons) item.addons.forEach(a => itemTotal += (a.price || 0));
           text += `${item.qty}x ${item.name} = ${formatRp(item.qty * itemTotal)}\n`;
         });
         text += `--------------------------------\n`;
@@ -500,25 +526,29 @@
         setTransactions(prev => [newTransaction, ...prev]);
         if (storeConfig.autoPrint) handlePrintOrJPG(newTransaction);
         setCart([]);
-        setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', tableNumber: '' });
+        setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', catatan: '' });
         setDiscount({ type: 'nominal', value: 0 });
         setIsCheckoutOpen(false);
         setIsCartOpen(false);
         showToast('Transaksi Berhasil!', 'success');
+        // Konfeti interaktif
+        if (window.confetti) {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
       }, [cart, orderInfo, cartCalculations, storeConfig.autoPrint, handlePrintOrJPG, showToast]);
 
-      // QRIS dynamic generation
+      // QRIS dengan ID tetap
       const generateQrisCode = useCallback((amount) => {
         if (!window.QRCode) return null;
-        // Dummy QRIS string with dynamic amount (simplified)
-        const qrisData = `00020101021226570011ID.CO.BPDDIY${storeConfig.qrisMerchantId}0215ID.CO.BPDDIY.WWW0118936000000000000010203UMI51440014ID.CO.QRIS.WWW0215ID2020102900000303UMI5204581253033605404${amount.toString().padStart(2, '0')}5802ID5920${storeConfig.appName}6014Kota Yogyakarta61055515562070703A016304E2F8`;
+        const merchantPan = "ID026533909051"; // default QRIS ID
+        const qrisData = `00020101021126570011ID.CO.BPDDIY${merchantPan}0215ID.CO.BPDDIY.WWW0118936000000000000010203UMI51440014ID.CO.QRIS.WWW0215ID2020102900000303UMI5204581253033605404${amount.toString().padStart(2, '0')}5802ID5920Mi Ayam Abun6014Kota Yogyakarta61055515562070703A016304E2F8`;
         return qrisData;
-      }, [storeConfig]);
+      }, []);
 
+      // Render QR payment
       const renderQrisPayment = () => {
         const amount = cartCalculations.grandTotal;
         const qrisString = generateQrisCode(amount);
-        const [qrCanvas, setQrCanvas] = useState(null);
         useEffect(() => {
           if (qrisString && window.QRCode) {
             const canvas = document.getElementById('qrcode-canvas');
@@ -540,19 +570,7 @@
         );
       };
 
-      const renderTransferPayment = () => (
-        <div className="p-4 flex flex-col items-center justify-center space-y-3 animate-fade-in">
-          <div className="bg-white p-4 rounded-2xl shadow-lg border border-gray-200 text-center w-full">
-            <p className="text-xs text-gray-500 mb-1">Transfer ke Rekening</p>
-            <p className="text-lg font-extrabold text-gray-800">{storeConfig.bankName}</p>
-            <p className="text-2xl font-mono font-bold text-[#8B0000] tracking-wider">{storeConfig.bankAccount}</p>
-            <p className="text-sm font-semibold mt-2">Total: {formatRp(cartCalculations.grandTotal)}</p>
-          </div>
-          <p className="text-xs text-gray-500">Konfirmasi setelah transfer berhasil</p>
-        </div>
-      );
-
-      // ========================== RENDERS ========================== //
+      // ==================== RENDER FUNCTIONS ====================
       const renderDashboard = () => {
         const today = new Date().toDateString();
         const todayTransactions = transactions.filter(t => new Date(t.timestamp).toDateString() === today);
@@ -647,6 +665,15 @@
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
           (selectedCategory === 'Semua' || item.category === selectedCategory)
         );
+        const handleItemClick = (item) => {
+          if (item.addons && item.addons.length > 0) {
+            setSelectedItemForAddon(item);
+            setSelectedAddons([]);
+            setAddonNotes('');
+          } else {
+            handleAddToCart(item);
+          }
+        };
         return (
           <div className="absolute inset-0 flex flex-col animate-fade-in">
             <div className="px-3 pt-3 pb-2 bg-white z-10 shrink-0 border-b border-gray-100">
@@ -669,15 +696,15 @@
                     <h2 className="text-sm font-extrabold text-gray-800 mb-2 flex items-center gap-2"><div className="w-1 h-4 bg-[#8B0000] rounded-full"/>{category}</h2>
                     <div className="grid grid-cols-2 gap-2">
                       {items.map(item=>(
-                        <div key={item.id} onClick={()=>{ handleAddToCart(item); }} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 active:scale-[0.97] transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[95px] relative overflow-hidden group hover:border-[#8B0000]/40 hover:shadow-md">
+                        <div key={item.id} onClick={()=>handleItemClick(item)} className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 active:scale-[0.97] transition-all duration-150 cursor-pointer flex flex-col justify-between min-h-[110px] relative overflow-hidden group hover:border-[#8B0000]/40 hover:shadow-md">
                           <div className="absolute -right-3 -top-3 w-14 h-14 bg-gray-50 rounded-full opacity-40 group-hover:bg-[#8B0000]/5 transition-colors"/>
-                          <div className="relative z-10">
+                          <div className="relative z-10 flex flex-col flex-1">
                             <item.icon className="w-4 h-4 text-gray-400 mb-1.5 group-hover:text-[#8B0000] transition-colors"/>
-                            <h3 className="font-bold text-xs text-gray-800 leading-tight mb-1 line-clamp-2">{item.name}</h3>
+                            <h3 className="font-bold text-sm text-gray-800 leading-tight mb-1 flex-1">{item.name}</h3>
                           </div>
-                          <div className="flex justify-between items-end relative z-10">
-                            <p className="text-[#8B0000] font-extrabold text-xs">{formatRp(item.price)}</p>
-                            <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[#8B0000] group-hover:text-white transition-colors"><Plus className="w-3.5 h-3.5"/></div>
+                          <div className="flex justify-between items-end relative z-10 mt-2">
+                            <p className="text-[#8B0000] font-extrabold text-sm">{formatRp(item.price)}</p>
+                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[#8B0000] group-hover:text-white transition-colors"><Plus className="w-4 h-4"/></div>
                           </div>
                         </div>
                       ))}
@@ -702,6 +729,134 @@
         );
       };
 
+      const renderAddonModal = () => {
+        if (!selectedItemForAddon) return null;
+        const item = selectedItemForAddon;
+        const toggleAddon = (addon) => {
+          setSelectedAddons(prev => prev.find(a=>a.id===addon.id) ? prev.filter(a=>a.id!==addon.id) : [...prev, addon]);
+        };
+        const currentPrice = item.price + selectedAddons.reduce((s,a)=>s+(a.price||0), 0);
+        return (
+          <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm no-print animate-fade-in">
+            <div className="bg-white w-full rounded-t-3xl max-h-[85vh] flex flex-col animate-slide-up">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 className="font-bold text-base">{item.name} - Pilih Penyajian</h3>
+                <button onClick={()=>setSelectedItemForAddon(null)} className="p-2 bg-gray-100 rounded-full text-gray-600 active:scale-95"><X className="w-5 h-5"/></button>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                <p className="text-xs text-gray-500">Pilih opsi penyajian (bisa pilih salah satu)</p>
+                <div className="space-y-2">
+                  {item.addons.map(addon => {
+                    const isSelected = selectedAddons.some(a=>a.id===addon.id);
+                    return (
+                      <div key={addon.id} onClick={()=>toggleAddon(addon)} className={`flex items-center justify-between p-3 rounded-xl border ${isSelected ? 'border-[#8B0000] bg-[#8B0000]/5 shadow-sm' : 'border-gray-200 bg-white'} cursor-pointer transition-all active:scale-[0.99]`}>
+                        <span className="text-sm font-medium">{addon.name}</span>
+                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'bg-[#8B0000] border-[#8B0000] text-white' : 'border-gray-300'}`}>{isSelected && <Check className="w-3 h-3"/>}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="p-4 border-t border-gray-100 bg-white pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+                <button className="w-full py-3 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-bold text-sm active:scale-95 shadow-lg" onClick={()=>handleAddToCart(item, selectedAddons, addonNotes)} disabled={selectedAddons.length===0}>
+                  Tambahkan • {formatRp(currentPrice)}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const renderCart = () => {
+        if(!isCartOpen) return null;
+        return (
+          <div className="absolute inset-0 z-40 flex flex-col bg-gray-50 no-print animate-slide-up">
+            <div className="bg-white px-3 py-3 flex items-center justify-between border-b shadow-sm sticky top-0 z-10">
+              <div className="flex items-center gap-2"><button onClick={()=>setIsCartOpen(false)} className="p-1.5 text-gray-600"><ArrowLeft className="w-5 h-5"/></button><h2 className="font-bold text-base">Pesanan</h2></div>
+              <button onClick={clearCart} className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg"><Trash2 className="w-3.5 h-3.5"/> Kosongkan</button>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide pb-28">
+              <section className="bg-white p-3 mb-1.5 space-y-3">
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {ORDER_TYPES.map(type=>(<button key={type} onClick={()=>setOrderInfo({...orderInfo,orderType:type})} className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap ${orderInfo.orderType===type?'bg-[#8B0000] text-white':'bg-gray-50 text-gray-600 border'}`}>{type}</button>))}
+                </div>
+                <input type="text" value={orderInfo.customerName} onChange={e=>setOrderInfo({...orderInfo,customerName:e.target.value})} placeholder="Nama Pelanggan" className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-xs"/>
+                <input type="text" value={orderInfo.catatan} onChange={e=>setOrderInfo({...orderInfo,catatan:e.target.value})} placeholder="Catatan Pesanan (misal: meja 3, depan)" className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-xs"/>
+              </section>
+              <section className="bg-white p-3 mb-1.5">
+                <h3 className="font-bold text-xs mb-3">Item ({cartCalculations.totalItems})</h3>
+                {cart.map((item)=>{
+                  let itemTotal = item.price;
+                  if(item.addons) item.addons.forEach(a=>itemTotal+= (a.price||0));
+                  itemTotal *= item.qty;
+                  const addonNames = item.addons?.map(a=>a.name).join(', ');
+                  return (
+                    <div key={item.cartItemId} className="flex gap-2.5 pb-3 border-b border-gray-50 last:border-0">
+                      <div className="flex flex-col items-center bg-gray-50 rounded-lg w-9 border">
+                        <button onClick={()=>updateCartQty(item.cartItemId,1)} className="w-full h-7 flex items-center justify-center"><Plus className="w-3.5 h-3.5"/></button>
+                        <span className="font-bold text-xs">{item.qty}</span>
+                        <button onClick={()=>updateCartQty(item.cartItemId,-1)} className="w-full h-7 flex items-center justify-center"><Minus className="w-3.5 h-3.5"/></button>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-between"><p className="font-bold text-xs">{item.name}{addonNames && <span className="text-gray-500 text-[10px]"> ({addonNames})</span>}</p><p className="font-bold text-xs text-[#8B0000]">{formatRp(itemTotal)}</p></div>
+                        {item.notes && <p className="text-[10px] text-orange-600 bg-orange-50 p-1 rounded mt-1">"{item.notes}"</p>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </section>
+              <section className="bg-white p-3">
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between"><span>Subtotal</span><span>{formatRp(cartCalculations.subtotal)}</span></div>
+                  <div className="flex justify-between text-blue-600 cursor-pointer" onClick={()=>setDialog({type:'prompt',title:'Diskon',placeholder:'Nominal',inputValue:discount.value?discount.value.toString():'',onConfirm:(val)=>{setDiscount({type:'nominal',value:Number(val)||0});setDialog(null);}})}><span>Diskon <Edit className="w-3 h-3 inline"/></span><span>-{formatRp(cartCalculations.discountAmount)}</span></div>
+                  {storeConfig.taxRate>0 && <div className="flex justify-between"><span>PPN {storeConfig.taxRate}%</span><span>{formatRp(cartCalculations.taxAmount)}</span></div>}
+                  {storeConfig.serviceCharge>0 && <div className="flex justify-between"><span>Layanan {storeConfig.serviceCharge}%</span><span>{formatRp(cartCalculations.serviceAmount)}</span></div>}
+                  <div className="border-t pt-2.5 mt-2.5 flex justify-between"><span className="font-bold">TOTAL</span><span className="text-xl font-black text-[#8B0000]">{formatRp(cartCalculations.grandTotal)}</span></div>
+                </div>
+              </section>
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t flex gap-2.5 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+              <button className="flex-1 py-2.5 rounded-xl bg-[#8B0000]/8 text-[#8B0000] font-bold text-xs" onClick={saveToHold}><Save className="w-4 h-4"/> Simpan</button>
+              <button className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-bold text-xs" onClick={()=>{setIsCheckoutOpen(true);setCheckoutMethod('cash');setCashGiven('');}}>Bayar</button>
+            </div>
+          </div>
+        );
+      };
+
+      const renderCheckout = () => {
+        if(!isCheckoutOpen) return null;
+        const handleNumpad = (val) => { if(val==='C') setCashGiven(''); else if(val==='000') setCashGiven(prev=>prev?prev+'000':prev); else setCashGiven(prev=>prev+val); };
+        const amountToPay = cartCalculations.grandTotal;
+        const change = Number(cashGiven) - amountToPay;
+        const isReady = checkoutMethod==='cash' ? Number(cashGiven)>=amountToPay : true; // QRIS selalu siap
+        return (
+          <div className="absolute inset-0 z-50 flex flex-col bg-gray-50 no-print animate-slide-up">
+            <div className="bg-white px-3 py-3 flex items-center gap-2 border-b"><button onClick={()=>setIsCheckoutOpen(false)}><ArrowLeft className="w-5 h-5"/></button><h2 className="font-bold text-base">Pembayaran</h2></div>
+            <div className="flex-1 overflow-y-auto">
+              <div className="bg-gradient-to-br from-[#8B0000] to-[#5c0000] text-white p-5 text-center"><p className="text-xs opacity-70">Total</p><p className="text-3xl font-black">{formatRp(amountToPay)}</p></div>
+              <div className="p-3 bg-white"><div className="grid grid-cols-2 gap-2">
+                {PAYMENT_METHODS.map(m=><button key={m.id} onClick={()=>{setCheckoutMethod(m.id);setCashGiven('');}} className={`py-2.5 rounded-xl border-2 flex flex-col items-center gap-1 ${checkoutMethod===m.id?'border-[#8B0000] bg-[#8B0000]/8 text-[#8B0000]':'border-gray-100 text-gray-500'}`}><m.icon className="w-5 h-5"/><span className="text-[10px] font-bold">{m.name}</span></button>)}
+              </div></div>
+              {checkoutMethod==='cash'? (
+                <div className="p-3 bg-white space-y-3">
+                  <div className="bg-gray-50 rounded-xl p-3.5 text-right"><p className="text-[10px] text-gray-400">Uang Diterima</p><p className={`text-xl font-bold ${cashGiven?'text-gray-800':'text-gray-300'}`}>{cashGiven?formatRp(Number(cashGiven)):'Rp 0'}</p></div>
+                  {Number(cashGiven)>0 && <div className={`p-3 rounded-xl flex justify-between ${change>=0?'bg-green-50 text-green-700':'bg-red-50 text-red-700'}`}><span>Kembalian</span><span className="font-black">{change>=0?formatRp(change):'Kurang '+formatRp(Math.abs(change))}</span></div>}
+                  <div className="flex gap-1.5"><button onClick={()=>setCashGiven(amountToPay.toString())} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg">Uang Pas</button><button onClick={()=>setCashGiven('50000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">50K</button><button onClick={()=>setCashGiven('100000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">100K</button></div>
+                  <div className="grid grid-cols-3 gap-2 mt-3">
+                    {['1','2','3','4','5','6','7','8','9','C','0','000'].map(key=><button key={key} onClick={()=>handleNumpad(key)} className={`py-3 text-lg font-bold rounded-xl active:scale-95 ${key==='C'?'bg-red-50 text-red-600':'bg-gray-50'}`}>{key}</button>)}
+                  </div>
+                </div>
+              ) : (
+                renderQrisPayment()
+              )}
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-bold text-sm disabled:opacity-50" disabled={!isReady} onClick={()=>processTransaction({method:checkoutMethod,cashGiven:checkoutMethod==='cash'?Number(cashGiven):amountToPay,change:checkoutMethod==='cash'?change:0})}>Selesaikan Transaksi</button>
+            </div>
+          </div>
+        );
+      };
+
       const renderHistory = () => (
         <div className="absolute inset-0 flex flex-col animate-fade-in">
           <div className="flex-1 overflow-y-auto scrollbar-hide px-3 py-4 pb-20 space-y-5">
@@ -713,7 +868,7 @@
                   {holdOrders.map(order=>(
                     <div key={order.id} className="bg-white p-3.5 rounded-2xl shadow-sm border border-orange-200">
                       <div className="flex justify-between items-start mb-1.5">
-                        <div><p className="font-bold text-sm text-gray-800">{order.orderInfo.customerName||'Tamu'} - Meja {order.orderInfo.tableNumber||'-'}</p><p className="text-[10px] text-gray-500">{formatDate(order.time)}</p></div>
+                        <div><p className="font-bold text-sm text-gray-800">{order.orderInfo.customerName||'Tamu'} - {order.orderInfo.catatan||'-'}</p><p className="text-[10px] text-gray-500">{formatDate(order.time)}</p></div>
                         <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-[10px] font-bold">HOLD</span>
                       </div>
                       <p className="text-xs font-semibold text-[#8B0000] mb-2">{formatRp(order.calculations.grandTotal)} ({order.calculations.totalItems} item)</p>
@@ -758,22 +913,11 @@
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-down">
               <div className="p-3 border-b border-gray-100 flex items-center gap-2.5 bg-gray-50"><div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm"><Store className="w-4 h-4 text-[#8B0000]"/></div><h3 className="font-bold text-sm">Profil Usaha</h3></div>
               <div className="p-3 space-y-2.5">
-                <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Logo URL</label><input type="text" value={storeConfig.logoUrl} onChange={e=>setStoreConfig({...storeConfig,logoUrl:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
                 <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Nama Usaha</label><input type="text" value={storeConfig.appName} onChange={e=>setStoreConfig({...storeConfig,appName:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
                 <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Alamat</label><textarea value={storeConfig.address} onChange={e=>setStoreConfig({...storeConfig,address:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs resize-none h-16"/></div>
                 <div className="grid grid-cols-2 gap-2">
                   <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Instagram</label><input type="text" value={storeConfig.instagram} onChange={e=>setStoreConfig({...storeConfig,instagram:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
                   <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Telepon</label><input type="tel" value={storeConfig.phone} onChange={e=>setStoreConfig({...storeConfig,phone:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-down">
-              <div className="p-3 border-b border-gray-100 flex items-center gap-2.5 bg-gray-50"><div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm"><Banknote className="w-4 h-4 text-blue-600"/></div><h3 className="font-bold text-sm">Pembayaran Digital</h3></div>
-              <div className="p-3 space-y-2.5">
-                <div><label className="text-[10px] font-bold text-gray-500 block mb-1">QRIS Merchant ID (dummy)</label><input type="text" value={storeConfig.qrisMerchantId} onChange={e=>setStoreConfig({...storeConfig,qrisMerchantId:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-[10px] font-bold text-gray-500 block mb-1">Bank</label><input type="text" value={storeConfig.bankName} onChange={e=>setStoreConfig({...storeConfig,bankName:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
-                  <div><label className="text-[10px] font-bold text-gray-500 block mb-1">No. Rekening</label><input type="text" value={storeConfig.bankAccount} onChange={e=>setStoreConfig({...storeConfig,bankAccount:e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs"/></div>
                 </div>
               </div>
             </div>
@@ -816,94 +960,6 @@
         );
       };
 
-      const renderCart = () => {
-        if(!isCartOpen) return null;
-        return (
-          <div className="absolute inset-0 z-40 flex flex-col bg-gray-50 no-print animate-slide-up">
-            <div className="bg-white px-3 py-3 flex items-center justify-between border-b shadow-sm sticky top-0 z-10">
-              <div className="flex items-center gap-2"><button onClick={()=>setIsCartOpen(false)} className="p-1.5 text-gray-600"><ArrowLeft className="w-5 h-5"/></button><h2 className="font-bold text-base">Pesanan</h2></div>
-              <button onClick={clearCart} className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg"><Trash2 className="w-3.5 h-3.5"/> Kosongkan</button>
-            </div>
-            <div className="flex-1 overflow-y-auto scrollbar-hide pb-28">
-              <section className="bg-white p-3 mb-1.5 space-y-3">
-                <div className="flex gap-1.5 overflow-x-auto pb-1">
-                  {ORDER_TYPES.map(type=>(<button key={type} onClick={()=>setOrderInfo({...orderInfo,orderType:type})} className={`px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap ${orderInfo.orderType===type?'bg-[#8B0000] text-white':'bg-gray-50 text-gray-600 border'}`}>{type}</button>))}
-                </div>
-                <input type="text" value={orderInfo.customerName} onChange={e=>setOrderInfo({...orderInfo,customerName:e.target.value})} placeholder="Nama Pelanggan" className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-xs"/>
-                <input type="text" value={orderInfo.tableNumber} onChange={e=>setOrderInfo({...orderInfo,tableNumber:e.target.value})} placeholder="No Meja" className="w-full px-3 py-2 bg-gray-50 border rounded-lg text-xs"/>
-              </section>
-              <section className="bg-white p-3 mb-1.5">
-                <h3 className="font-bold text-xs mb-3">Item ({cartCalculations.totalItems})</h3>
-                {cart.map((item,idx)=>{
-                  let itemTotal = item.price;
-                  if(item.addons) item.addons.forEach(a=>itemTotal+=a.price);
-                  itemTotal *= item.qty;
-                  return (
-                    <div key={item.cartItemId} className="flex gap-2.5 pb-3 border-b border-gray-50 last:border-0">
-                      <div className="flex flex-col items-center bg-gray-50 rounded-lg w-9 border">
-                        <button onClick={()=>updateCartQty(item.cartItemId,1)} className="w-full h-7 flex items-center justify-center"><Plus className="w-3.5 h-3.5"/></button>
-                        <span className="font-bold text-xs">{item.qty}</span>
-                        <button onClick={()=>updateCartQty(item.cartItemId,-1)} className="w-full h-7 flex items-center justify-center"><Minus className="w-3.5 h-3.5"/></button>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between"><p className="font-bold text-xs">{item.name}</p><p className="font-bold text-xs text-[#8B0000]">{formatRp(itemTotal)}</p></div>
-                        {item.addons?.length>0 && <div className="text-[10px] text-gray-500">{item.addons.map(a=><div key={a.id}>+ {a.name}</div>)}</div>}
-                        {item.notes && <p className="text-[10px] text-orange-600 bg-orange-50 p-1 rounded mt-1">"{item.notes}"</p>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </section>
-              <section className="bg-white p-3">
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between"><span>Subtotal</span><span>{formatRp(cartCalculations.subtotal)}</span></div>
-                  <div className="flex justify-between text-blue-600 cursor-pointer" onClick={()=>setDialog({type:'prompt',title:'Diskon',placeholder:'Nominal',inputValue:discount.value?discount.value.toString():'',onConfirm:(val)=>{setDiscount({type:'nominal',value:Number(val)||0});setDialog(null);}})}><span>Diskon <Edit className="w-3 h-3 inline"/></span><span>-{formatRp(cartCalculations.discountAmount)}</span></div>
-                  {storeConfig.taxRate>0 && <div className="flex justify-between"><span>PPN {storeConfig.taxRate}%</span><span>{formatRp(cartCalculations.taxAmount)}</span></div>}
-                  {storeConfig.serviceCharge>0 && <div className="flex justify-between"><span>Layanan {storeConfig.serviceCharge}%</span><span>{formatRp(cartCalculations.serviceAmount)}</span></div>}
-                  <div className="border-t pt-2.5 mt-2.5 flex justify-between"><span className="font-bold">TOTAL</span><span className="text-xl font-black text-[#8B0000]">{formatRp(cartCalculations.grandTotal)}</span></div>
-                </div>
-              </section>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t flex gap-2.5 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-              <button className="flex-1 py-2.5 rounded-xl bg-[#8B0000]/8 text-[#8B0000] font-bold text-xs" onClick={saveToHold}><Save className="w-4 h-4"/> Simpan</button>
-              <button className="flex-[2] py-2.5 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-bold text-xs" onClick={()=>{setIsCheckoutOpen(true);setCheckoutMethod('cash');setCashGiven('');}}>Bayar</button>
-            </div>
-          </div>
-        );
-      };
-
-      const renderCheckout = () => {
-        if(!isCheckoutOpen) return null;
-        const handleNumpad = (val) => { if(val==='C') setCashGiven(''); else if(val==='000') setCashGiven(prev=>prev?prev+'000':prev); else setCashGiven(prev=>prev+val); };
-        const amountToPay = cartCalculations.grandTotal;
-        const change = Number(cashGiven) - amountToPay;
-        const isReady = checkoutMethod!=='cash' || Number(cashGiven)>=amountToPay;
-        return (
-          <div className="absolute inset-0 z-50 flex flex-col bg-gray-50 no-print animate-slide-up">
-            <div className="bg-white px-3 py-3 flex items-center gap-2 border-b"><button onClick={()=>setIsCheckoutOpen(false)}><ArrowLeft className="w-5 h-5"/></button><h2 className="font-bold text-base">Pembayaran</h2></div>
-            <div className="flex-1 overflow-y-auto">
-              <div className="bg-gradient-to-br from-[#8B0000] to-[#5c0000] text-white p-5 text-center"><p className="text-xs opacity-70">Total</p><p className="text-3xl font-black">{formatRp(amountToPay)}</p></div>
-              <div className="p-3 bg-white"><div className="grid grid-cols-3 gap-2">
-                {PAYMENT_METHODS.map(m=><button key={m.id} onClick={()=>{setCheckoutMethod(m.id);setCashGiven('');}} className={`py-2.5 rounded-xl border-2 flex flex-col items-center gap-1 ${checkoutMethod===m.id?'border-[#8B0000] bg-[#8B0000]/8 text-[#8B0000]':'border-gray-100 text-gray-500'}`}><m.icon className="w-5 h-5"/><span className="text-[10px] font-bold">{m.name}</span></button>)}
-              </div></div>
-              {checkoutMethod==='cash'? (
-                <div className="p-3 bg-white space-y-3">
-                  <div className="bg-gray-50 rounded-xl p-3.5 text-right"><p className="text-[10px] text-gray-400">Uang Diterima</p><p className={`text-xl font-bold ${cashGiven?'text-gray-800':'text-gray-300'}`}>{cashGiven?formatRp(Number(cashGiven)):'Rp 0'}</p></div>
-                  {Number(cashGiven)>0 && <div className={`p-3 rounded-xl flex justify-between ${change>=0?'bg-green-50 text-green-700':'bg-red-50 text-red-700'}`}><span>Kembalian</span><span className="font-black">{change>=0?formatRp(change):'Kurang '+formatRp(Math.abs(change))}</span></div>}
-                  <div className="flex gap-1.5"><button onClick={()=>setCashGiven(amountToPay.toString())} className="px-3 py-1.5 bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg">Uang Pas</button><button onClick={()=>setCashGiven('50000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">50K</button><button onClick={()=>setCashGiven('100000')} className="px-3 py-1.5 bg-gray-100 text-[11px] font-bold rounded-lg">100K</button></div>
-                  <div className="grid grid-cols-3 gap-2 mt-3">
-                    {['1','2','3','4','5','6','7','8','9','C','0','000'].map(key=><button key={key} onClick={()=>handleNumpad(key)} className={`py-3 text-lg font-bold rounded-xl active:scale-95 ${key==='C'?'bg-red-50 text-red-600':'bg-gray-50'}`}>{key}</button>)}
-                  </div>
-                </div>
-              ): checkoutMethod==='qris'? renderQrisPayment() : renderTransferPayment()}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 bg-white p-3 border-t pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-              <button className="w-full py-3 rounded-xl bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white font-bold text-sm disabled:opacity-50" disabled={!isReady} onClick={()=>processTransaction({method:checkoutMethod,cashGiven:checkoutMethod==='cash'?Number(cashGiven):amountToPay,change:checkoutMethod==='cash'?change:0})}>Selesaikan</button>
-            </div>
-          </div>
-        );
-      };
-
       const renderBottomNav = () => {
         const items = [
           { id:'dashboard', label:'Home', icon:Home },
@@ -933,11 +989,13 @@
         const { id, timestamp, cart, orderInfo, calculations, payment } = receiptData;
         const content = (
           <div className="w-[280px] bg-white text-black font-mono text-[11px] leading-tight p-4 pb-6">
-            <StrukLogo logoUrl={storeConfig.logoUrl} />
-            <h1 className="text-sm font-extrabold mb-0.5 text-center">{storeConfig.appName}</h1>
-            <p className="text-[9px] text-center whitespace-pre-line">{storeConfig.address}</p>
-            <p className="text-[9px] text-center">{storeConfig.instagram}</p>
-            <div className="border-b border-dashed my-1.5"/>
+            <div className="text-center mb-2">
+              <img src="./abun200.png" className="w-12 h-12 object-contain mx-auto mb-1.5 rounded-xl" alt="logo" />
+              <h1 className="text-sm font-extrabold mb-0.5">{storeConfig.appName}</h1>
+              <p className="text-[9px] whitespace-pre-line">{storeConfig.address}</p>
+              <p className="text-[9px]">{storeConfig.instagram}</p>
+              <div className="border-b border-dashed my-1.5"/>
+            </div>
             <table className="w-full text-[10px]"><tbody>
               <tr><td className="w-12">Tgl</td><td>: {new Date(timestamp).toLocaleString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td></tr>
               <tr><td>No</td><td>: {id}</td></tr>
@@ -947,8 +1005,9 @@
             <div className="text-[10px]">
               {cart.map(item=>{
                 let itemTotal = item.price;
-                if(item.addons) item.addons.forEach(a=>itemTotal+=a.price);
-                return (<div key={item.cartItemId} className="mb-1"><div className="flex justify-between font-bold"><span>{item.name}</span></div>{item.addons?.length>0 && <div className="pl-2 text-[9px]">{item.addons.map(a=><div key={a.id}>+ {a.name}</div>)}</div>}<div className="flex justify-between pl-2"><span>{item.qty} x {itemTotal.toLocaleString('id-ID')}</span><span>{(item.qty*itemTotal).toLocaleString('id-ID')}</span></div></div>)
+                if(item.addons) item.addons.forEach(a=>itemTotal+= (a.price||0));
+                const addonNames = item.addons?.map(a=>a.name).join(', ');
+                return (<div key={item.cartItemId} className="mb-1"><div className="flex justify-between font-bold"><span>{item.name}{addonNames && <span className="font-normal"> ({addonNames})</span>}</span></div><div className="flex justify-between pl-2"><span>{item.qty} x {itemTotal.toLocaleString('id-ID')}</span><span>{(item.qty*itemTotal).toLocaleString('id-ID')}</span></div></div>)
               })}
             </div>
             <div className="border-b border-dashed mb-1"/>
@@ -979,8 +1038,7 @@
             <header className="bg-gradient-to-r from-[#8B0000] to-[#b22222] text-white px-4 py-3 pt-[max(env(safe-area-inset-top),0.5rem)] flex items-center justify-between z-20 shrink-0 no-print overflow-visible">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur border border-white/30 shadow-inner">
-                  {storeConfig.logoUrl ? <img src={storeConfig.logoUrl} className="w-8 h-8 object-contain rounded-lg" alt="logo"/> :
-                  <img src="https://cdn-icons-png.flaticon.com/512/3081/3081367.png" className="w-8 h-8 brightness-0 invert" alt="logo"/>}
+                  <img src="./abun200.png" className="w-8 h-8 object-contain rounded-lg" alt="logo"/>
                 </div>
                 <div>
                   <h1 className="text-xl font-black tracking-wide leading-tight drop-shadow-md">{storeConfig.appName}</h1>
@@ -1010,6 +1068,7 @@
               {activeTab==='settings' && renderSettings()}
             </main>
             {!isCartOpen && !isCheckoutOpen && renderBottomNav()}
+            {renderAddonModal()}
             {renderCart()}
             {renderCheckout()}
             {renderDialog()}
