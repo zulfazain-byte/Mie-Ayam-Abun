@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#8B0000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>POS Mi Ayam Abun Pro</title>
+  <title>Mi Ayam Abun</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -97,7 +97,7 @@
     // ============================================================================
     // INDEXEDDB WRAPPER (Offline Storage)
     // ============================================================================
-    const DB_NAME = 'POSMiAyamDB';
+    const DB_NAME = 'MiAyamAbunDB';
     const DB_VERSION = 1;
     const openDB = () => {
       return new Promise((resolve, reject) => {
@@ -171,7 +171,7 @@
       { id: 'b14', category: 'Minuman', name: 'Ice/Hot Milo + Kental', price: 7000, icon: Coffee },
     ];
 
-    const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online (Ojol)'];
+    const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online'];
     const PAYMENT_METHODS = [
       { id: 'cash', name: 'Tunai', icon: Banknote },
       { id: 'qris', name: 'QRIS', icon: QrCode },
