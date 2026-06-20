@@ -313,19 +313,6 @@
             );
         };
 
-        // Logo SVG untuk struk tetap pakai SVG karena untuk cetak thermal
-        const StrukLogo = () => (
-            <svg viewBox="0 0 100 100" className="w-14 h-14 mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 45 C10 75, 30 90, 50 90 C70 90, 90 75, 90 45 Z" fill="#000" stroke="#000" />
-                <path d="M10 45 L90 45" stroke="#000" strokeWidth="6" />
-                <path d="M30 45 Q35 25, 50 25 T70 45" />
-                <path d="M40 45 Q45 15, 60 15 T80 45" />
-                <path d="M20 45 Q30 35, 40 45" />
-                <line x1="85" y1="10" x2="25" y2="45" strokeWidth="5" />
-                <line x1="95" y1="15" x2="35" y2="45" strokeWidth="5" />
-            </svg>
-        );
-
         // Logo Header menggunakan gambar abun200.png
         const HeaderLogo = () => (
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/30 shadow-inner overflow-hidden">
@@ -397,17 +384,12 @@
             const [searchQuery, setSearchQuery] = useState('');
             const [selectedCategory, setSelectedCategory] = useState('Semua');
 
-            // Ripple effect state (unused)
-            const [ripples, setRipples] = useState([]);
-
             useEffect(() => {
                 document.body.style.overflowX = 'hidden';
                 document.body.classList.add('flex', 'justify-center');
-                // Splash Screen Logic
                 const t1 = setTimeout(() => setSplashState('fading'), 2000);
                 const t2 = setTimeout(() => setSplashState('hidden'), 2500);
-                return () => { clearTimeout(t1);
-                    clearTimeout(t2); };
+                return () => { clearTimeout(t1); clearTimeout(t2); };
             }, []);
 
             const showToast = (message, type = 'success') => {
@@ -439,9 +421,7 @@
                     type: 'confirm',
                     title: 'Kosongkan Keranjang',
                     message: 'Apakah Anda yakin ingin menghapus semua pesanan?',
-                    onConfirm: () => { setCart([]);
-                        setDiscount({ type: 'nominal', value: 0 });
-                        setDialog(null); },
+                    onConfirm: () => { setCart([]); setDiscount({ type: 'nominal', value: 0 }); setDialog(null); },
                 });
             };
 
@@ -452,8 +432,7 @@
                     if (item.addons) item.addons.forEach(addon => itemPrice += addon.price);
                     subtotal += (itemPrice * item.qty);
                 });
-                let discountAmount = discount.type === 'percent' ? subtotal * (discount.value / 100) : discount
-                    .value;
+                let discountAmount = discount.type === 'percent' ? subtotal * (discount.value / 100) : discount.value;
                 const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount);
                 const taxAmount = subtotalAfterDiscount * (storeConfig.taxRate / 100);
                 const serviceAmount = subtotalAfterDiscount * (storeConfig.serviceCharge / 100);
@@ -496,13 +475,11 @@
                         try {
                             if (!window.html2canvas) {
                                 const script = document.createElement('script');
-                                script.src =
-                                    'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
                                 document.body.appendChild(script);
                                 await new Promise(res => script.onload = res);
                             }
-                            const canvas = await window.html2canvas(receiptRef.current, { scale: 2,
-                                backgroundColor: '#ffffff' });
+                            const canvas = await window.html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
                             const link = document.createElement('a');
                             link.download = `Struk-${trx.id}.jpg`;
                             link.href = canvas.toDataURL('image/jpeg', 0.9);
@@ -548,12 +525,10 @@
                 if (period === 'hari') {
                     filtered = transactions.filter(t => new Date(t.timestamp).toDateString() === now.toDateString());
                 } else if (period === 'minggu') {
-                    const oneWeekAgo = new Date();
-                    oneWeekAgo.setDate(now.getDate() - 7);
+                    const oneWeekAgo = new Date(); oneWeekAgo.setDate(now.getDate() - 7);
                     filtered = transactions.filter(t => new Date(t.timestamp) >= oneWeekAgo);
                 } else if (period === 'bulan') {
-                    const oneMonthAgo = new Date();
-                    oneMonthAgo.setMonth(now.getMonth() - 1);
+                    const oneMonthAgo = new Date(); oneMonthAgo.setMonth(now.getMonth() - 1);
                     filtered = transactions.filter(t => new Date(t.timestamp) >= oneMonthAgo);
                 }
                 if (filtered.length === 0) { showToast(`Tidak ada data untuk ${period} ini`, 'error'); return; }
@@ -573,9 +548,7 @@
                     'Kembalian (Rp)': t.payment.change,
                 }));
                 const ws = XLSX.utils.json_to_sheet(excelData);
-                const wscols = [{ wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 },
-                    { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
-                ];
+                const wscols = [{ wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
                 ws['!cols'] = wscols;
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Laporan Penjualan");
@@ -614,10 +587,7 @@
                     type: 'confirm',
                     title: 'Reset Aplikasi',
                     message: 'Seluruh data transaksi dan pengaturan akan dihapus secara permanen. Lanjutkan?',
-                    onConfirm: () => {
-                        localStorage.clear();
-                        window.location.reload();
-                    },
+                    onConfirm: () => { localStorage.clear(); window.location.reload(); },
                 });
                 setIsHeaderMenuOpen(false);
             };
@@ -649,11 +619,7 @@
                     message: 'Masukkan modal awal uang tunai di laci (Rp):',
                     placeholder: 'Contoh: 100000',
                     inputValue: '',
-                    onConfirm: (val) => {
-                        setShift({ isOpen: true, startTime: new Date(), startCash: Number(val) || 0 });
-                        setDialog(null);
-                        showToast('Shift Kasir Dibuka', 'success');
-                    },
+                    onConfirm: (val) => { setShift({ isOpen: true, startTime: new Date(), startCash: Number(val) || 0 }); setDialog(null); showToast('Shift Kasir Dibuka', 'success'); },
                 });
             };
 
@@ -662,20 +628,14 @@
                     type: 'confirm',
                     title: 'Tutup Shift',
                     message: 'Anda yakin ingin menutup shift kasir saat ini?',
-                    onConfirm: () => {
-                        setShift({ isOpen: false, startTime: null, startCash: 0 });
-                        setDialog(null);
-                        showToast('Shift Kasir Ditutup', 'success');
-                    },
+                    onConfirm: () => { setShift({ isOpen: false, startTime: null, startCash: 0 }); setDialog(null); showToast('Shift Kasir Ditutup', 'success'); },
                 });
             };
 
             const copyQrisId = () => {
                 navigator.clipboard.writeText(storeConfig.qrisMerchantId || 'ID026533909051').then(() => {
                     showToast('QRIS Merchant ID disalin!', 'success');
-                }).catch(() => {
-                    showToast('Gagal menyalin', 'error');
-                });
+                }).catch(() => showToast('Gagal menyalin', 'error'));
             };
 
             // ========================== RENDERS ========================== //
@@ -709,9 +669,7 @@
                 const bestSellers = Object.entries(itemCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
                 const getLast7Days = () => {
                     const days = [];
-                    for (let i = 6; i >= 0; i--) { const d = new Date();
-                        d.setDate(d.getDate() - i);
-                        days.push(d); }
+                    for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d); }
                     return days;
                 };
                 const maxSales7D = Math.max(...getLast7Days().map(d => transactions.filter(t => new Date(t.timestamp).toDateString() === d.toDateString()).reduce((sum, t) => sum + t.calculations.grandTotal, 0)), 1);
@@ -724,12 +682,8 @@
                                 <h2 className="text-sm font-medium opacity-80 mb-1">Pendapatan Hari Ini</h2>
                                 <p className="text-3xl font-extrabold tracking-tight mb-4">{ formatRp(totalSales) }</p>
                                 <div className="flex gap-2">
-                                    <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20">
-                                        <Receipt className="w-3.5 h-3.5" /> { totalOrders } Trx
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20">
-                                        <TrendingUp className="w-3.5 h-3.5" /> Avg: { formatRp(avgOrder) }
-                                    </div>
+                                    <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20"><Receipt className="w-3.5 h-3.5" /> { totalOrders } Trx</div>
+                                    <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-sm border border-white/20"><TrendingUp className="w-3.5 h-3.5" /> Avg: { formatRp(avgOrder) }</div>
                                 </div>
                             </div>
 
@@ -739,10 +693,7 @@
                                     <div className="space-y-2">
                                         { bestSellers.map(([name, qty], idx) => (
                                             <div key={ name } className="flex justify-between items-center p-2 bg-gray-50 rounded-xl">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-black text-gray-400 text-xs w-4">{ idx + 1 }.</span>
-                                                    <span className="font-semibold text-sm text-gray-800">{ name }</span>
-                                                </div>
+                                                <div className="flex items-center gap-2"><span className="font-black text-gray-400 text-xs w-4">{ idx + 1 }.</span><span className="font-semibold text-sm text-gray-800">{ name }</span></div>
                                                 <span className="text-xs font-bold text-[#9A1C1F] bg-[#9A1C1F]/10 px-2 py-1 rounded-md">{ qty } Porsi</span>
                                             </div>
                                         ))}
@@ -759,9 +710,7 @@
                                         const height = (daySales / maxSales7D) * 100;
                                         return (
                                             <div key={ idx } className="flex-1 flex flex-col items-center justify-end gap-1 group relative">
-                                                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-gray-800 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap transition-opacity pointer-events-none z-10">
-                                                    { formatRp(daySales) }
-                                                </div>
+                                                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-gray-800 text-white text-[9px] px-2 py-1 rounded whitespace-nowrap transition-opacity pointer-events-none z-10">{ formatRp(daySales) }</div>
                                                 <div className="w-full bg-[#9A1C1F] rounded-t-sm transition-all duration-300 group-hover:bg-[#ff7e5f]" style={{ height: `${height}%`, minHeight: '4px' }}></div>
                                                 <span className="text-[9px] text-gray-500 font-medium">{ date.toLocaleDateString('id-ID', { weekday: 'short' }) }</span>
                                             </div>
@@ -771,32 +720,22 @@
                                 <div className="mt-5">
                                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Ekspor Laporan (Excel)</p>
                                     <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                                        <button onClick={() => exportExcel('hari')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform">
-                                            <FileSpreadsheet className="w-3 h-3" /> Hari Ini
-                                        </button>
-                                        <button onClick={() => exportExcel('minggu')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform">
-                                            <FileSpreadsheet className="w-3 h-3" /> Minggu Ini
-                                        </button>
-                                        <button onClick={() => exportExcel('bulan')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform">
-                                            <FileSpreadsheet className="w-3 h-3" /> Bulan Ini
-                                        </button>
+                                        <button onClick={() => exportExcel('hari')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform"><FileSpreadsheet className="w-3 h-3" /> Hari Ini</button>
+                                        <button onClick={() => exportExcel('minggu')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform"><FileSpreadsheet className="w-3 h-3" /> Minggu Ini</button>
+                                        <button onClick={() => exportExcel('bulan')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100 active:scale-95 transition-transform"><FileSpreadsheet className="w-3 h-3" /> Bulan Ini</button>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                                    <div className="bg-orange-100 w-10 h-10 rounded-xl flex items-center justify-center text-orange-600 mb-3">
-                                        <Clock className="w-5 h-5" />
-                                    </div>
+                                    <div className="bg-orange-100 w-10 h-10 rounded-xl flex items-center justify-center text-orange-600 mb-3"><Clock className="w-5 h-5" /></div>
                                     <p className="text-xs text-gray-500 font-medium">Status Shift</p>
                                     <p className="font-bold text-gray-800">{ shift.isOpen ? 'Buka' : 'Tutup' }</p>
                                     { !shift.isOpen && <Button variant="outline" className="mt-3 text-xs py-1.5 px-2" onClick={ promptBukaShift }>Buka Shift</Button>}
                                 </div>
                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                                    <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 mb-3">
-                                        <Save className="w-5 h-5" />
-                                    </div>
+                                    <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 mb-3"><Save className="w-5 h-5" /></div>
                                     <p className="text-xs text-gray-500 font-medium">Pesanan Ditahan</p>
                                     <p className="font-bold text-gray-800">{ holdOrders.length } Bill</p>
                                     { holdOrders.length > 0 && <Button variant="secondary" className="mt-3 text-xs py-1.5 px-2" onClick={() => setActiveTab('history')}>Lihat</Button>}
@@ -865,9 +804,7 @@
                                                         <item.icon className="w-5 h-5 text-gray-400 mb-2 group-hover:text-[#9A1C1F] transition-colors" />
                                                         <h3 className="font-bold text-[13px] text-gray-800 leading-tight mb-1">{ item.name }</h3>
                                                         { item.addons && item.addons.length > 0 && (
-                                                            <span className="text-[10px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full font-medium">
-                                                                Pilih Ice / Hot
-                                                            </span>
+                                                            <span className="text-[10px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full font-medium">Pilih Ice / Hot</span>
                                                         )}
                                                     </div>
                                                     <div className="flex justify-between items-end relative z-10 mt-1">
@@ -911,20 +848,14 @@
                     <div className="absolute inset-0 flex flex-col animate-fade-in">
                         <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-6">
                             <h2 className="text-xl font-bold text-gray-800">Riwayat Transaksi</h2>
-
                             { holdOrders.length > 0 && (
                                 <section className="animate-slide-up">
-                                    <h3 className="font-bold text-sm text-[#9A1C1F] mb-3 uppercase tracking-wider flex items-center gap-2">
-                                        <Clock className="w-4 h-4" /> Pesanan Ditahan
-                                    </h3>
+                                    <h3 className="font-bold text-sm text-[#9A1C1F] mb-3 uppercase tracking-wider flex items-center gap-2"><Clock className="w-4 h-4" /> Pesanan Ditahan</h3>
                                     <div className="space-y-3">
                                         { holdOrders.map(order => (
                                             <div key={order.id} className="bg-white p-4 rounded-2xl shadow-sm border border-orange-200">
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <p className="font-bold text-gray-800">{ order.orderInfo.customerName || 'Tamu' } - { order.orderInfo.orderNotes || '-' }</p>
-                                                        <p className="text-xs text-gray-500">{ formatDate(order.time) }</p>
-                                                    </div>
+                                                    <div><p className="font-bold text-gray-800">{ order.orderInfo.customerName || 'Tamu' } - { order.orderInfo.orderNotes || '-' }</p><p className="text-xs text-gray-500">{ formatDate(order.time) }</p></div>
                                                     <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">HOLD</span>
                                                 </div>
                                                 <p className="text-sm font-semibold text-[#9A1C1F] mb-3">{ formatRp(order.calculations.grandTotal) } ({ order.calculations.totalItems } item)</p>
@@ -936,9 +867,7 @@
                             )}
 
                             <section className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-                                <h3 className="font-bold text-sm text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4" /> Selesai Hari Ini
-                                </h3>
+                                <h3 className="font-bold text-sm text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Selesai Hari Ini</h3>
                                 { transactions.length === 0 ? (
                                     <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 border-dashed">
                                         <History className="w-10 h-10 mx-auto text-gray-300 mb-2" />
@@ -979,23 +908,11 @@
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 animate-slide-up">
                                 <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm"><Store className="w-5 h-5 text-[#9A1C1F]" /></div><h3 className="font-bold text-gray-800">Profil Usaha</h3></div>
                                 <div className="p-4 space-y-3">
-                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Nama Usaha</label>
-                                        <input type="text" value={storeConfig.appName} onChange={e => setStoreConfig({...storeConfig, appName: e.target.value})}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" />
-                                    </div>
-                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Alamat</label>
-                                        <textarea value={storeConfig.address} onChange={e => setStoreConfig({...storeConfig, address: e.target.value})}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none resize-none h-20 transition-colors" ></textarea>
-                                    </div>
+                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Nama Usaha</label><input type="text" value={storeConfig.appName} onChange={e => setStoreConfig({...storeConfig, appName: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" /></div>
+                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Alamat</label><textarea value={storeConfig.address} onChange={e => setStoreConfig({...storeConfig, address: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none resize-none h-20 transition-colors" ></textarea></div>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div><label className="text-xs font-bold text-gray-500 block mb-1">Instagram</label>
-                                            <input type="text" value={storeConfig.instagram} onChange={e => setStoreConfig({...storeConfig, instagram: e.target.value})}
-                                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" />
-                                        </div>
-                                        <div><label className="text-xs font-bold text-gray-500 block mb-1">Telepon</label>
-                                            <input type="tel" value={storeConfig.phone} onChange={e => setStoreConfig({...storeConfig, phone: e.target.value})}
-                                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" />
-                                        </div>
+                                        <div><label className="text-xs font-bold text-gray-500 block mb-1">Instagram</label><input type="text" value={storeConfig.instagram} onChange={e => setStoreConfig({...storeConfig, instagram: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" /></div>
+                                        <div><label className="text-xs font-bold text-gray-500 block mb-1">Telepon</label><input type="tel" value={storeConfig.phone} onChange={e => setStoreConfig({...storeConfig, phone: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" /></div>
                                     </div>
                                 </div>
                             </div>
@@ -1003,14 +920,8 @@
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 animate-slide-up" style={{ animationDelay: '0.1s' }}>
                                 <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm"><Calculator className="w-5 h-5 text-blue-600" /></div><h3 className="font-bold text-gray-800">Biaya Tambahan</h3></div>
                                 <div className="p-4 grid grid-cols-2 gap-4">
-                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Pajak(PPN) %</label>
-                                        <input type="number" value={storeConfig.taxRate} onChange={e => setStoreConfig({...storeConfig, taxRate: Number(e.target.value)})}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" />
-                                    </div>
-                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Service Charge %</label>
-                                        <input type="number" value={storeConfig.serviceCharge} onChange={e => setStoreConfig({...storeConfig, serviceCharge: Number(e.target.value)})}
-                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" />
-                                    </div>
+                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Pajak(PPN) %</label><input type="number" value={storeConfig.taxRate} onChange={e => setStoreConfig({...storeConfig, taxRate: Number(e.target.value)})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" /></div>
+                                    <div><label className="text-xs font-bold text-gray-500 block mb-1">Service Charge %</label><input type="number" value={storeConfig.serviceCharge} onChange={e => setStoreConfig({...storeConfig, serviceCharge: Number(e.target.value)})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-[#9A1C1F] focus:outline-none transition-colors" /></div>
                                 </div>
                             </div>
 
@@ -1019,9 +930,7 @@
                                 <div className="p-4">
                                     <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border border-gray-200">
                                         <span className="flex-1 font-mono font-bold text-sm text-gray-800">{ storeConfig.qrisMerchantId || 'ID026533909051' }</span>
-                                        <button onClick={copyQrisId} className="p-2 bg-[#9A1C1F] text-white rounded-lg active:scale-95 transition-all flex items-center gap-1 text-xs font-bold">
-                                            <Copy className="w-3.5 h-3.5" /> Salin
-                                        </button>
+                                        <button onClick={copyQrisId} className="p-2 bg-[#9A1C1F] text-white rounded-lg active:scale-95 transition-all flex items-center gap-1 text-xs font-bold"><Copy className="w-3.5 h-3.5" /> Salin</button>
                                     </div>
                                     <p className="text-[10px] text-gray-400 mt-2">ID ini digunakan untuk generate QRIS saat pembayaran digital.</p>
                                 </div>
@@ -1046,16 +955,14 @@
                                 <div className="p-4 space-y-4">
                                     <div className="flex items-center justify-between py-2 border-b border-gray-50">
                                         <div><p className="font-semibold text-sm text-gray-800">Mode Cetak Struk</p><p className="text-[11px] text-gray-500">Pilih format output</p></div>
-                                        <select value={storeConfig.receiptMode} onChange={e => setStoreConfig({...storeConfig, receiptMode: e.target.value})}
-                                            className="bg-gray-50 border border-gray-200 text-sm font-bold rounded-lg px-3 py-2 outline-none text-[#9A1C1F] transition-colors">
+                                        <select value={storeConfig.receiptMode} onChange={e => setStoreConfig({...storeConfig, receiptMode: e.target.value})} className="bg-gray-50 border border-gray-200 text-sm font-bold rounded-lg px-3 py-2 outline-none text-[#9A1C1F] transition-colors">
                                             <option value="thermal">🖨️ Thermal</option>
                                             <option value="jpg">🖼️ JPG</option>
                                         </select>
                                     </div>
                                     <div className="flex items-center justify-between py-2 border-b border-gray-50">
                                         <div><p className="font-semibold text-sm text-gray-800">Auto Proses Struk</p><p className="text-[11px] text-gray-500">Otomatis buat struk</p></div>
-                                        <div onClick={() => setStoreConfig({...storeConfig, autoPrint: !storeConfig.autoPrint})}
-                                            className={`w-12 h-7 rounded-full relative cursor-pointer transition-colors duration-300 ${storeConfig.autoPrint ? 'bg-[#9A1C1F]' : 'bg-gray-300'}`}>
+                                        <div onClick={() => setStoreConfig({...storeConfig, autoPrint: !storeConfig.autoPrint})} className={`w-12 h-7 rounded-full relative cursor-pointer transition-colors duration-300 ${storeConfig.autoPrint ? 'bg-[#9A1C1F]' : 'bg-gray-300'}`}>
                                             <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 ${storeConfig.autoPrint ? 'right-1' : 'left-1'}`}></div>
                                         </div>
                                     </div>
@@ -1083,10 +990,7 @@
                         <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
                             <h3 className="text-xl font-bold text-gray-800 mb-2">{ dialog.title }</h3>
                             { dialog.message && <p className="text-sm text-gray-600 mb-5 leading-relaxed">{ dialog.message }</p>}
-                            { dialog.type === 'prompt' && <input type="number" value={dialog.inputValue || ''} onChange={(e) => setDialog({ ...dialog, inputValue: e.target.value })}
-                                placeholder={dialog.placeholder}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:border-[#9A1C1F] mb-5 text-center transition-colors" autoFocus />
-                            }
+                            { dialog.type === 'prompt' && <input type="number" value={dialog.inputValue || ''} onChange={(e) => setDialog({ ...dialog, inputValue: e.target.value })} placeholder={dialog.placeholder} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:border-[#9A1C1F] mb-5 text-center transition-colors" autoFocus /> }
                             <div className="flex gap-3">
                                 <Button variant="ghost" className="flex-1 bg-gray-100 hover:bg-gray-200" onClick={() => setDialog(null)}>Batal</Button>
                                 <Button variant="primary" className="flex-1" onClick={() => dialog.onConfirm(dialog.inputValue)}>Konfirmasi</Button>
@@ -1119,9 +1023,7 @@
                         <div className="bg-white w-full max-w-sm rounded-3xl max-h-[90vh] flex flex-col animate-popup shadow-2xl overflow-hidden">
                             <div className="p-4 border-b border-gray-100 flex justify-between items-center relative bg-gray-50">
                                 <h3 className="font-bold text-lg">{ item.name }</h3>
-                                <button onClick={() => setSelectedItemForAddon(null)} className="p-2 bg-white rounded-full shadow-sm text-gray-600 active:scale-95 transition-all">
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <button onClick={() => setSelectedItemForAddon(null)} className="p-2 bg-white rounded-full shadow-sm text-gray-600 active:scale-95 transition-all"><X className="w-5 h-5" /></button>
                             </div>
                             <div className="p-4 overflow-y-auto flex-1 space-y-6">
                                 { item.addons && item.addons.length > 0 && (
@@ -1146,7 +1048,7 @@
                                         </div>
                                     </div>
                                 )}
-                                {/* Catatan pesanan dihilangkan untuk minuman */}
+                                {/* Catatan pesanan hanya untuk non-minuman */}
                                 { item.category !== 'Minuman' && (
                                     <div className="animate-fade-in">
                                         <p className="font-bold text-sm text-gray-800 mb-2">Catatan Khusus</p>
@@ -1176,9 +1078,7 @@
                                 <button onClick={() => setIsCartOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button>
                                 <h2 className="font-bold text-lg text-gray-800">Detail Pesanan</h2>
                             </div>
-                            <button onClick={clearCart} className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 px-2 py-1.5 rounded-lg active:scale-95 transition-all hover:bg-red-100">
-                                <Trash2 className="w-4 h-4" /> Kosongkan
-                            </button>
+                            <button onClick={clearCart} className="text-xs font-bold text-red-500 flex items-center gap-1 bg-red-50 px-2 py-1.5 rounded-lg active:scale-95 transition-all hover:bg-red-100"><Trash2 className="w-4 h-4" /> Kosongkan</button>
                         </div>
 
                         <div className="flex-1 overflow-y-auto pb-24">
@@ -1186,9 +1086,7 @@
                                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                     { ORDER_TYPES.map(type => (
                                         <button key={type} onClick={() => setOrderInfo({...orderInfo, orderType: type})}
-                                            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${orderInfo.orderType === type ? 'bg-[#9A1C1F] text-white shadow-md' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
-                                            { type }
-                                        </button>
+                                            className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 active:scale-95 ${orderInfo.orderType === type ? 'bg-[#9A1C1F] text-white shadow-md' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>{ type }</button>
                                     ))}
                                 </div>
                                 <div>
@@ -1221,13 +1119,9 @@
                                             return (
                                                 <div key={item.cartItemId} className="flex gap-3 pb-4 border-b border-gray-50 last:border-0 last:pb-0 animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
                                                     <div className="flex flex-col items-center justify-between bg-gray-50 rounded-xl p-1 w-10 h-auto min-h-[70px] border border-gray-100 shrink-0 shadow-sm">
-                                                        <button onClick={() => updateCartQty(item.cartItemId, 1)} className="w-full h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-lg active:scale-95 transition-all">
-                                                            <Plus className="w-4 h-4" />
-                                                        </button>
+                                                        <button onClick={() => updateCartQty(item.cartItemId, 1)} className="w-full h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-lg active:scale-95 transition-all"><Plus className="w-4 h-4" /></button>
                                                         <span className="font-bold text-sm text-gray-800">{ item.qty }</span>
-                                                        <button onClick={() => updateCartQty(item.cartItemId, -1)} className="w-full h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-lg active:scale-95 transition-all">
-                                                            <Minus className="w-4 h-4" />
-                                                        </button>
+                                                        <button onClick={() => updateCartQty(item.cartItemId, -1)} className="w-full h-7 flex items-center justify-center text-gray-600 hover:bg-gray-200 rounded-lg active:scale-95 transition-all"><Minus className="w-4 h-4" /></button>
                                                     </div>
                                                     <div className="flex-1 pt-1">
                                                         <div className="flex justify-between items-start">
@@ -1237,16 +1131,12 @@
                                                         { item.addons && item.addons.length > 0 && (
                                                             <div className="mt-1 space-y-0.5">
                                                                 { item.addons.map(addon => (
-                                                                    <p key={addon.id} className="text-xs text-gray-500 flex justify-between">
-                                                                        <span>+ { addon.name }</span>
-                                                                    </p>
+                                                                    <p key={addon.id} className="text-xs text-gray-500 flex justify-between"><span>+ { addon.name }</span></p>
                                                                 ))}
                                                             </div>
                                                         )}
                                                         { item.notes && (
-                                                            <p className="text-[11px] text-orange-600 mt-1 bg-orange-50 p-1.5 rounded-lg border border-orange-100 italic">
-                                                                "{ item.notes }"
-                                                            </p>
+                                                            <p className="text-[11px] text-orange-600 mt-1 bg-orange-50 p-1.5 rounded-lg border border-orange-100 italic">"{ item.notes }"</p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -1270,17 +1160,11 @@
                                                         inputValue: discount.value > 0 ? discount.value.toString() : '',
                                                         onConfirm: (val) => { setDiscount({ type: 'nominal', value: Number(val) || 0 }); setDialog(null); },
                                                     });
-                                                }}>
-                                                Diskon(Rp) <Edit className="w-3 h-3" />
-                                            </span>
+                                                }}>Diskon(Rp) <Edit className="w-3 h-3" /></span>
                                             <span className="text-red-500">-{ formatRp(cartCalculations.discountAmount) }</span>
                                         </div>
-                                        { storeConfig.taxRate > 0 && (
-                                            <div className="flex justify-between text-gray-600"><span>PPN({ storeConfig.taxRate } %)</span><span>{ formatRp(cartCalculations.taxAmount) }</span></div>
-                                        )}
-                                        { storeConfig.serviceCharge > 0 && (
-                                            <div className="flex justify-between text-gray-600"><span>Layanan({ storeConfig.serviceCharge } %)</span><span>{ formatRp(cartCalculations.serviceAmount) }</span></div>
-                                        )}
+                                        { storeConfig.taxRate > 0 && <div className="flex justify-between text-gray-600"><span>PPN({ storeConfig.taxRate } %)</span><span>{ formatRp(cartCalculations.taxAmount) }</span></div> }
+                                        { storeConfig.serviceCharge > 0 && <div className="flex justify-between text-gray-600"><span>Layanan({ storeConfig.serviceCharge } %)</span><span>{ formatRp(cartCalculations.serviceAmount) }</span></div> }
                                         <div className="border-t border-dashed border-gray-300 pt-3 mt-3 flex justify-between items-center">
                                             <span className="font-bold text-gray-800">TOTAL TAGIHAN</span>
                                             <span className="text-2xl font-black text-[#9A1C1F]">{ formatRp(cartCalculations.grandTotal) }</span>
@@ -1336,9 +1220,7 @@
                                 <div className="p-4 bg-white space-y-4 animate-fade-in flex flex-col">
                                     <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center transition-colors">
                                         <p className="text-xs font-bold text-gray-400 mb-1">Uang Diterima</p>
-                                        <p className={`text-3xl font-black ${cashGiven ? 'text-[#9A1C1F]' : 'text-gray-300'}`}>
-                                            { cashGiven ? formatRp(Number(cashGiven)) : 'Rp 0' }
-                                        </p>
+                                        <p className={`text-3xl font-black ${cashGiven ? 'text-[#9A1C1F]' : 'text-gray-300'}`}>{ cashGiven ? formatRp(Number(cashGiven)) : 'Rp 0' }</p>
                                     </div>
                                     { Number(cashGiven) > 0 && (
                                         <div className={`p-4 rounded-xl flex flex-col items-center justify-center text-center border transition-all animate-slide-up ${change >= 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
@@ -1354,9 +1236,7 @@
                                     <div className="grid grid-cols-3 gap-2 mt-2">
                                         { ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '000'].map(key => (
                                             <button key={key} onClick={() => handleNumpad(key)}
-                                                className={`py-4 text-xl font-bold rounded-2xl active:scale-95 transition-transform ${key === 'C' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-50 text-gray-800 border border-gray-100 hover:bg-gray-100 shadow-sm'}`}>
-                                                { key }
-                                            </button>
+                                                className={`py-4 text-xl font-bold rounded-2xl active:scale-95 transition-transform ${key === 'C' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-50 text-gray-800 border border-gray-100 hover:bg-gray-100 shadow-sm'}`}>{ key }</button>
                                         ))}
                                     </div>
                                 </div>
@@ -1365,9 +1245,9 @@
                             { checkoutMethod === 'qris' && (
                                 <div className="p-8 text-center bg-white h-auto flex flex-col items-center justify-center animate-fade-in">
                                     {/* QRIS diperbesar */}
-                                    <div className="w-64 h-64 bg-gray-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-gray-300 mb-4 relative overflow-hidden">
+                                    <div className="w-72 h-72 bg-gray-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-gray-300 mb-4 relative overflow-hidden">
                                         <div className="absolute inset-0 flex items-center justify-center">
-                                            <QrCode className="w-28 h-28 text-gray-600" />
+                                            <QrCode className="w-32 h-32 text-gray-600" />
                                         </div>
                                     </div>
                                     <p className="text-gray-700 font-bold text-sm mb-1">Scan QRIS</p>
@@ -1424,7 +1304,6 @@
                         <div className="absolute top-[-9999px] left-[-9999px] z-[-9999] print:hidden">
                             <div ref={receiptRef} className="w-[300px] bg-white text-black font-mono text-[12px] leading-tight p-5 pb-8">
                                 <div className="text-center mb-3">
-                                    <StrukLogo />
                                     <h1 className="text-base font-extrabold mb-1">{ storeConfig.appName }</h1>
                                     <p className="text-[10px] whitespace-pre-line">{ storeConfig.address }</p>
                                     <p>{ storeConfig.instagram }</p>
@@ -1473,7 +1352,6 @@
 
                         <div className="hidden print:block w-full max-w-[58mm] mx-auto text-black bg-white font-mono text-[11px] leading-tight p-0 m-0">
                             <div className="text-center mb-3">
-                                <StrukLogo />
                                 <h1 className="text-base font-extrabold mb-1">{ storeConfig.appName }</h1>
                                 <p className="text-[10px] whitespace-pre-line">{ storeConfig.address }</p>
                                 <p>{ storeConfig.instagram }</p>
@@ -1524,9 +1402,10 @@
 
             return (
                 <div className="w-full h-[100dvh] sm:h-screen bg-[#333] relative flex justify-center overflow-hidden font-sans text-gray-800">
-                    <div className="w-full sm:max-w-md bg-white h-full relative shadow-2xl flex flex-col overflow-hidden">
+                    {/* Container full width tanpa max-w */}
+                    <div className="w-full bg-white h-full relative shadow-2xl flex flex-col overflow-hidden">
 
-                        {/* SPLASH SCREEN */} { renderSplashScreen() }
+                        { renderSplashScreen() }
 
                         <header className="bg-[#9A1C1F] text-[#F9F6F0] p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative overflow-visible transition-all duration-300">
                             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
