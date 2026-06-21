@@ -1,6 +1,6 @@
 {
-  "name": "Mi Ayam Abun POS",
-  "short_name": "Abun POS",
+  "name": "Mi Ayam Abun",
+  "short_name": "Mie Ayam Abun",
   "description": "Sistem Kasir Mi Ayam Abun",
   "start_url": "./",
   "display": "standalone",
