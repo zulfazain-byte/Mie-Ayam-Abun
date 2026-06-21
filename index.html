@@ -10,55 +10,62 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>POS Mi Ayam Abun</title>
 
-    <!-- PWA Manifest -->
-    <script>
-        const manifestJSON = {
-            "name": "POS Mi Ayam Abun Pro",
-            "short_name": "Mi Ayam Abun",
-            "start_url": window.location.href.split('?')[0],
-            "display": "standalone",
-            "orientation": "portrait",
-            "background_color": "#ffffff",
-            "theme_color": "#9A1C1F",
-            "description": "Sistem Kasir Mi Ayam Abun – Cepat, Mudah, Profesional",
-            "icons": [{
-                "src": "abun500.png",
-                "sizes": "500x500",
-                "type": "image/png",
-                "purpose": "any maskable"
-            }]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifestJSON)], { type: 'application/json' });
-        const manifestUrl = URL.createObjectURL(manifestBlob);
-        const linkEl = document.createElement('link');
-        linkEl.rel = 'manifest';
-        linkEl.href = manifestUrl;
-        document.head.appendChild(linkEl);
-    </script>
+<link rel="manifest" href="manifest.json">
 
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                const swCode = `
-                const CACHE_NAME = 'pos-miayam-abun-v6';
-                self.addEventListener('install', (e) => {
-                    self.skipWaiting();
-                });
-                self.addEventListener('activate', (e) => {
-                    e.waitUntil(self.clients.claim());
-                });
-                self.addEventListener('fetch', (e) => {
-                    e.respondWith(
-                        caches.match(e.request).then((cached) => {
-                            return cached || fetch(e.request).catch(() => cached);
-                        })
-                    );
-                });
-                `;
-                const swBlob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(swBlob);
-                navigator.serviceWorker.register(swUrl, { scope: '/' }).catch(() => {});
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('✅ Service Worker terdaftar!', reg.scope))
+                    .catch(err => console.warn('⚠️ Service Worker gagal:', err));
             });
+        }
+
+        // Tampilkan prompt install native Android
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            
+            // Buat banner pop-up instalasi custom
+            const installBanner = document.createElement('div');
+            installBanner.id = 'install-banner';
+            installBanner.className = 'fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 z-[300] flex items-center gap-3 animate-slide-up border border-gray-200 max-w-md mx-auto';
+            installBanner.innerHTML = `
+                <img src="abun200.png" class="w-10 h-10 object-contain rounded-lg" alt="Logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjwvc3ZnPg=='"/>
+                <div class="flex-1">
+                  <p class="font-bold text-sm text-gray-800">Pasang Aplikasi</p>
+                  <p class="text-xs text-gray-500">Simpan Mi Ayam Abun di layar utama</p>
+                </div>
+                <button id="install-btn" class="bg-[#9A1C1F] text-white px-4 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all">Pasang</button>
+                <button id="dismiss-btn" class="text-gray-400 p-2 active:scale-95 transition-all">✕</button>
+            `;
+            document.body.appendChild(installBanner);
+
+            document.getElementById('install-btn').addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    if (outcome === 'accepted') {
+                        console.log('✅ User menerima instalasi');
+                    }
+                    deferredPrompt = null;
+                    installBanner.remove();
+                }
+            });
+
+            document.getElementById('dismiss-btn').addEventListener('click', () => {
+                installBanner.remove();
+            });
+        });
+
+        // Sembunyikan banner jika aplikasi sudah terinstal (berjalan dalam mode standalone)
+        window.addEventListener('appinstalled', () => {
+            const banner = document.getElementById('install-banner');
+            if (banner) banner.remove();
+            console.log('✅ Aplikasi berhasil diinstal');
+        });
+    </script>
 
             // Tampilkan prompt install native
             let deferredPrompt;
