@@ -1626,20 +1626,77 @@
             body { background: white !important; display: block !important; margin: 0; padding: 0; min-height: auto; } 
             html { width: 58mm; } 
         }
-        body {
+        /* Letakkan di dalam <style> yang sudah ada */
+body, div, p, span, h1, h2, h3, h4, h5, h6, a, li, td, th, b, strong, i, em, button, label {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
 }
 
-/* Izinkan seleksi pada input dan textarea agar tetap bisa digunakan */
-input, textarea {
+/* Izinkan seleksi hanya pada input & textarea (agar tetap bisa ngetik) */
+input, textarea, [contenteditable="true"] {
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
     user-select: text;
 }
+        // Letakkan di <script> setelah DOM siap (bisa dalam window.onload)
+(function() {
+    'use strict';
+
+    // Mencegah klik kanan
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Mencegah seleksi dengan mouse (drag select)
+    document.addEventListener('selectstart', e => {
+        if (!isInputFocused()) e.preventDefault();
+    });
+
+    // Cek apakah fokus di input/textarea
+    function isInputFocused() {
+        const tag = document.activeElement.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable;
+    }
+
+    // Blokir copy, cut, paste (kecuali di input)
+    ['copy', 'cut', 'paste'].forEach(event => {
+        document.addEventListener(event, e => {
+            if (!isInputFocused()) e.preventDefault();
+        });
+    });
+
+    // Blokir drag (gambar & teks)
+    document.addEventListener('dragstart', e => e.preventDefault());
+
+    // Blokir shortcut keyboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+U, Ctrl+S, Ctrl+P, F12, Ctrl+Shift+I/J/C
+    document.addEventListener('keydown', e => {
+        if (isInputFocused()) return; // biarkan input tetap berfungsi
+
+        const key = e.keyCode;
+        const ctrl = e.ctrlKey || e.metaKey;
+        const shift = e.shiftKey;
+
+        // F12
+        if (key === 123) {
+            e.preventDefault();
+            return false;
+        }
+
+        if (ctrl) {
+            // Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+U, Ctrl+S, Ctrl+P
+            if (key === 67 || key === 88 || key === 86 || key === 85 || key === 83 || key === 80) {
+                e.preventDefault();
+                return false;
+            }
+            // Ctrl+Shift+I (DevTools), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspect)
+            if (shift && (key === 73 || key === 74 || key === 67)) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+})();
     </style>
 </body>
 </html>
