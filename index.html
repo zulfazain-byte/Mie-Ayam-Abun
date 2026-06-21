@@ -49,81 +49,30 @@
         document.head.appendChild(linkElement);
     </script>
 
-    <!-- Service Worker Registration -->
     <script>
+        // Registrasi Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                // Buat service worker secara dinamis
-                const swCode = `
-                    const CACHE_NAME = 'mi-ayam-abun-v6';
-                    const urlsToCache = [
-                        './',
-                        './index.html',
-                        './abun200.png',
-                        './abun500.png'
-                    ];
-
-                    self.addEventListener('install', event => {
-                        event.waitUntil(
-                            caches.open(CACHE_NAME)
-                                .then(cache => cache.addAll(urlsToCache))
-                                .then(() => self.skipWaiting())
-                        );
-                    });
-
-                    self.addEventListener('activate', event => {
-                        event.waitUntil(
-                            caches.keys().then(cacheNames => {
-                                return Promise.all(
-                                    cacheNames.filter(name => name !== CACHE_NAME)
-                                        .map(name => caches.delete(name))
-                                );
-                            }).then(() => self.clients.claim())
-                        );
-                    });
-
-                    self.addEventListener('fetch', event => {
-                        event.respondWith(
-                            caches.match(event.request)
-                                .then(response => response || fetch(event.request))
-                        );
-                    });
-                `;
-                
-                const swBlob = new Blob([swCode], { type: 'application/javascript' });
-                const swUrl = URL.createObjectURL(swBlob);
-                
-                navigator.serviceWorker.register(swUrl)
+                navigator.serviceWorker.register('sw.js')
                     .then(reg => console.log('✅ Service Worker terdaftar!', reg.scope))
                     .catch(err => console.warn('⚠️ Service Worker gagal:', err));
             });
         }
-    </script>
 
-    <!-- Install Prompt Handler - HANYA SATU -->
-    <script>
+        // Prompt Install PWA (hanya sekali deklarasi)
         let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            // Cegah prompt otomatis
-            e.preventDefault();
-            // Simpan event untuk digunakan nanti
-            deferredPrompt = e;
-            
-            // Hapus banner lama jika ada
-            const existingBanner = document.getElementById('install-banner');
-            if (existingBanner) existingBanner.remove();
-            
-            // Buat banner pop-up instalasi custom
+        const showInstallBanner = () => {
+            // Hindari menampilkan banner lagi jika sudah ada
+            if (document.getElementById('install-banner')) return;
+
             const installBanner = document.createElement('div');
             installBanner.id = 'install-banner';
             installBanner.className = 'fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 z-[300] flex items-center gap-3 animate-slide-up border border-gray-200 max-w-md mx-auto';
             installBanner.innerHTML = `
-                <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
-                    <img src="abun200.png" class="w-8 h-8 object-contain" alt="Logo" onerror="this.style.display='none'"/>
-                </div>
+                <img src="abun200.png" class="w-10 h-10 object-contain rounded-lg" alt="Logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjwvc3ZnPg=='"/>
                 <div class="flex-1">
-                    <p class="font-bold text-sm text-gray-800">Pasang Aplikasi</p>
-                    <p class="text-xs text-gray-500">Simpan Mi Ayam Abun di layar utama</p>
+                  <p class="font-bold text-sm text-gray-800">Pasang Aplikasi</p>
+                  <p class="text-xs text-gray-500">Simpan Mi Ayam Abun di layar utama</p>
                 </div>
                 <button id="install-btn" class="bg-[#9A1C1F] text-white px-4 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all">Pasang</button>
                 <button id="dismiss-btn" class="text-gray-400 p-2 active:scale-95 transition-all">✕</button>
@@ -134,9 +83,7 @@
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
                     const { outcome } = await deferredPrompt.userChoice;
-                    if (outcome === 'accepted') {
-                        console.log('✅ User menerima instalasi');
-                    }
+                    console.log(outcome === 'accepted' ? '✅ User menerima instalasi' : 'User menolak');
                     deferredPrompt = null;
                     installBanner.remove();
                 }
@@ -145,6 +92,13 @@
             document.getElementById('dismiss-btn').addEventListener('click', () => {
                 installBanner.remove();
             });
+        };
+
+        // Tangkap event beforeinstallprompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Tahan prompt native
+            deferredPrompt = e; // Simpan event untuk nanti
+            showInstallBanner(); // Tampilkan banner custom
         });
 
         // Sembunyikan banner jika aplikasi sudah terinstal
