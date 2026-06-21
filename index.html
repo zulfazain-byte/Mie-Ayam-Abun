@@ -91,6 +91,69 @@
         }
     </script>
     
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mencegah klik kanan (context menu)
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        // Mencegah seleksi teks dengan mouse
+        document.addEventListener('selectstart', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        // Mencegah copy, cut, paste (kecuali di input/textarea)
+        function isInputFocused() {
+            const tag = document.activeElement.tagName;
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable;
+        }
+
+        document.addEventListener('copy', function(e) {
+            if (!isInputFocused()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+        document.addEventListener('cut', function(e) {
+            if (!isInputFocused()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+        document.addEventListener('paste', function(e) {
+            if (!isInputFocused()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Mencegah drag gambar/link
+        document.addEventListener('dragstart', function(e) {
+            e.preventDefault();
+            return false;
+        });
+
+        // Mencegah shortcut keyboard berbahaya
+        document.addEventListener('keydown', function(e) {
+            if (isInputFocused()) return; // izinkan di input
+
+            // F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+S, Ctrl+P, Ctrl+C, Ctrl+X, Ctrl+V
+            const forbidden = 
+                e.keyCode === 123 || // F12
+                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
+                (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 83 || e.keyCode === 80 || e.keyCode === 67 || e.keyCode === 88 || e.keyCode === 86));
+
+            if (forbidden) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+</script>
+    
     <!-- Library Eksternal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
@@ -1563,6 +1626,20 @@
             body { background: white !important; display: block !important; margin: 0; padding: 0; min-height: auto; } 
             html { width: 58mm; } 
         }
+        body {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Izinkan seleksi pada input dan textarea agar tetap bisa digunakan */
+input, textarea {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
     </style>
 </body>
 </html>
