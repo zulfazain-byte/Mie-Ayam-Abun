@@ -326,6 +326,9 @@
             const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
             const [splashState, setSplashState] = useState('visible');
 
+            // State Waktu Realtime Header
+            const [currentTime, setCurrentTime] = useState(new Date());
+
             // Local Storage State
             const [storeConfig, setStoreConfig] = useState(() => {
                 const saved = localStorage.getItem('pos_config');
@@ -359,6 +362,23 @@
             useEffect(() => { localStorage.setItem('pos_shift', JSON.stringify(shift)); }, [shift]);
             useEffect(() => { localStorage.setItem('pos_cart', JSON.stringify(cart)); }, [cart]);
             useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
+
+            // Update Waktu Realtime
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const formatHeaderDate = (date) => {
+                const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+                const dayName = days[date.getDay()];
+                const day = date.getDate();
+                const month = months[date.getMonth()];
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                return `${dayName}, ${day} ${month} • ${hours}:${minutes}`;
+            };
 
             const [discount, setDiscount] = useState({ type: 'nominal', value: 0 });
             const [isCartOpen, setIsCartOpen] = useState(false);
@@ -612,11 +632,24 @@
             };
 
             const promptTutupShift = () => {
+                const shiftSales = transactions
+                    .filter(t => new Date(t.timestamp) >= new Date(shift.startTime))
+                    .reduce((sum, t) => sum + t.calculations.grandTotal, 0);
+
+                const expectedCash = shift.startCash + transactions
+                    .filter(t => new Date(t.timestamp) >= new Date(shift.startTime) && t.payment.method === 'cash')
+                    .reduce((sum, t) => sum + t.payment.cashGiven - t.payment.change, 0);
+
                 setDialog({
                     type: 'confirm',
                     title: 'Tutup Shift',
-                    message: 'Anda yakin ingin menutup shift kasir saat ini?',
-                    onConfirm: () => { setShift({ isOpen: false, startTime: null, startCash: 0 }); setDialog(null); showToast('Shift Kasir Ditutup', 'success'); },
+                    message: `Ringkasan Shift Hari Ini:\n• Total Penjualan: ${formatRp(shiftSales)}\n• Ekspektasi Uang Laci (Modal + Tunai): ${formatRp(expectedCash)}\n\nAnda yakin ingin menutup shift kasir saat ini?`,
+                    onConfirm: () => { 
+                        setShift({ isOpen: false, startTime: null, startCash: 0 }); 
+                        setDialog(null); 
+                        showToast('Shift Kasir Ditutup', 'success'); 
+                        setActiveTab('pos'); 
+                    },
                 });
             };
 
@@ -735,6 +768,34 @@
                                     <span className="text-[12px] font-extrabold animate-shine">✨ Dibuat oleh Dhiya 'Ulhag Zulfa Zain</span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderShiftGate = () => {
+                return (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-white z-[35] animate-fade-in text-center">
+                        <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-gray-100">
+                            <Store className="w-10 h-10 text-[#9A1C1F]" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-800 mb-2 tracking-tight">Mulai Shift Baru</h2>
+                        <p className="text-sm text-gray-500 mb-8 max-w-[280px] leading-relaxed">Silakan masukkan modal awal uang tunai di laci kasir untuk mulai menerima pesanan.</p>
+                        
+                        <div className="w-full max-w-sm space-y-5">
+                            <div className="text-left relative">
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block ml-1">Uang Tunai Awal Laci</label>
+                                <div className="relative flex items-center shadow-sm rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 focus-within:border-[#9A1C1F] focus-within:ring-2 focus-within:ring-[#9A1C1F]/20 transition-all">
+                                    <span className="pl-4 font-bold text-gray-500">Rp</span>
+                                    <input type="number" id="startCashInput" placeholder="0" 
+                                        className="w-full bg-transparent py-4 pl-3 pr-4 text-xl font-black text-gray-800 focus:outline-none" />
+                                </div>
+                            </div>
+                            <Button variant="primary" className="w-full py-4 text-lg shadow-[#9A1C1F]/40" onClick={() => {
+                                const val = document.getElementById('startCashInput').value;
+                                setShift({ isOpen: true, startTime: new Date(), startCash: Number(val) || 0 });
+                                showToast('Shift Kasir Berhasil Dibuka', 'success');
+                            }}>Buka Shift Sekarang</Button>
                         </div>
                     </div>
                 );
@@ -955,7 +1016,7 @@
                                             <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 ${storeConfig.autoPrint ? 'right-1' : 'left-1'}`}></div>
                                         </div>
                                     </div>
-                                    <Button variant={shift.isOpen ? "danger" : "primary"} className="w-full mt-4" onClick={() => { if (shift.isOpen) { promptTutupShift(); } else { promptBukaShift(); } }}>
+                                    <Button variant={shift.isOpen ? "danger" : "primary"} className="w-full mt-4" onClick={() => { if (shift.isOpen) { promptTutupShift(); } else { setActiveTab('pos'); } }}>
                                         { shift.isOpen ? 'Tutup Shift Kasir' : 'Buka Shift Kasir' }
                                     </Button>
                                 </div>
@@ -978,7 +1039,7 @@
                     <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in">
                         <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
                             <h3 className="text-xl font-bold text-gray-800 mb-2">{ dialog.title }</h3>
-                            { dialog.message && <p className="text-sm text-gray-600 mb-5 leading-relaxed">{ dialog.message }</p>}
+                            { dialog.message && <p className="text-sm text-gray-600 mb-5 leading-relaxed whitespace-pre-line">{ dialog.message }</p>}
                             { dialog.type === 'prompt' && <input type="number" value={dialog.inputValue || ''} onChange={(e) => setDialog({ ...dialog, inputValue: e.target.value })} placeholder={dialog.placeholder} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-lg font-bold focus:outline-none focus:border-[#9A1C1F] mb-5 text-center transition-colors" autoFocus /> }
                             <div className="flex gap-3">
                                 <Button variant="ghost" className="flex-1 bg-gray-100 hover:bg-gray-200" onClick={() => setDialog(null)}>Batal</Button>
@@ -1008,32 +1069,32 @@
                 let currentPrice = item.price + selectedAddons.reduce((s, a) => s + a.price, 0);
 
                 return (
-                    <div className="absolute inset-0 z-50 flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-                        <div className="bg-white w-full max-w-sm rounded-3xl flex flex-col max-h-[85dvh] animate-popup shadow-2xl overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 flex justify-between items-center relative bg-gray-50 shrink-0">
-                                <h3 className="font-bold text-lg">{ item.name }</h3>
-                                <button onClick={() => setSelectedItemForAddon(null)} className="p-2 bg-white rounded-full shadow-sm text-gray-600 active:scale-95 transition-all"><X className="w-5 h-5" /></button>
+                <div className="w-full h-[100dvh] sm:h-screen bg-[#333] relative flex justify-center overflow-hidden font-sans text-gray-800">
+                    {/* Container full width tanpa max-w */}
+                    <div className="w-full bg-white h-full relative shadow-2xl flex flex-col overflow-hidden">
+
+                        { renderSplashScreen() }
+
+                        <header className="bg-[#9A1C1F] text-[#F9F6F0] p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative overflow-visible transition-all duration-300 shadow-md">
+                            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
+                            <div className="flex items-center gap-3 relative z-10">
+                                <HeaderLogo />
+                                <div className="flex flex-col">
+                                    <h1 className="text-lg font-black tracking-wide leading-tight">{ storeConfig.appName }</h1>
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                        <div className="flex items-center gap-1 text-[10px] bg-black/20 w-max px-2 py-0.5 rounded-full shadow-inner border border-white/10">
+                                            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${shift.isOpen ? 'bg-green-400' : 'bg-red-400'}`}></span>
+                                            <span className="font-bold tracking-wide">{ shift.isOpen ? 'Aktif' : 'Tutup' }</span>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[10px] text-white/90">
+                                            <Clock className="w-3 h-3" />
+                                            <span className="font-medium tracking-wide">{ formatHeaderDate(currentTime) }</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="p-4 overflow-y-auto flex-1 space-y-6">
-                                { item.addons && item.addons.length > 0 && (
-                                    <div className="animate-fade-in">
-                                        <p className="font-bold text-sm text-gray-800 mb-3">Pilih Suhu / Variasi (Wajib)</p>
-                                        <div className="space-y-2">
-                                            { item.addons.map(addon => {
-                                                const isSelected = selectedAddons.find(a => a.id === addon.id);
-                                                return (
-                                                    <div key={addon.id} onClick={() => toggleAddon(addon)}
-                                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all duration-200 active:scale-[0.97] ${isSelected ? 'border-[#9A1C1F] bg-[#9A1C1F]/5 shadow-sm ring-2 ring-[#9A1C1F]/20' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                                                        <span className="text-sm font-medium">{ addon.name }</span>
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-sm text-gray-500">{ addon.price > 0 ? '+' + formatRp(addon.price) : 'Gratis' }</span>
-                                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-[#9A1C1F] border-[#9A1C1F] text-white' : 'border-gray-300'}`}>
-                                                                { isSelected && <Check className="w-3.5 h-3.5" /> }
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+
+                            <div className="relative z-20">
                                         </div>
                                     </div>
                                 )}
@@ -1424,11 +1485,15 @@
                         </div>
                     </header>
 
-                    <main className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 print:hidden" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
-                        { activeTab === 'dashboard' && renderDashboard() }
-                        { activeTab === 'pos' && renderPOS() }
-                        { activeTab === 'history' && renderHistory() }
-                        { activeTab === 'settings' && renderSettings() }
+                    <main className="flex-1 overflow-hidden relative print:hidden bg-gray-50" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
+                        { !shift.isOpen && activeTab !== 'settings' ? renderShiftGate() : (
+                            <>
+                                { activeTab === 'dashboard' && renderDashboard() }
+                                { activeTab === 'pos' && renderPOS() }
+                                { activeTab === 'history' && renderHistory() }
+                                { activeTab === 'settings' && renderSettings() }
+                            </>
+                        )}
                     </main>
 
                     { !isCartOpen && !isCheckoutOpen && renderBottomNav() }
@@ -1448,12 +1513,12 @@
         root.render(<App />);
     </script>
     <style>
-        *, *::before, *::after { box-sizing: border-box; }
-        body, #root { overflow-x: hidden; }
-        img, svg, video { max-width: 100%; height: auto; }
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(3px) scale(0.995); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .animate-fade-in { 
+            animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+            will-change: opacity, transform;
+            backface-visibility: hidden;
+        }
 
         @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
