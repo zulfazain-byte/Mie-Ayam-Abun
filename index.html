@@ -10,47 +10,12 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>POS Mi Ayam Abun</title>
 
-    <!-- Manifest JSON untuk PWA -->
-    <script>
-        // Buat manifest secara dinamis jika file tidak ada
-        const manifest = {
-            name: "Mi Ayam Abun POS",
-            short_name: "Mi Ayam Abun",
-            description: "Sistem Kasir Mi Ayam Abun",
-            start_url: ".",
-            display: "standalone",
-            background_color: "#9A1C1F",
-            theme_color: "#9A1C1F",
-            orientation: "portrait",
-            icons: [
-                {
-                    src: "abun200.png",
-                    sizes: "192x192",
-                    type: "image/png",
-                    purpose: "any maskable"
-                },
-                {
-                    src: "abun500.png",
-                    sizes: "512x512",
-                    type: "image/png",
-                    purpose: "any maskable"
-                }
-            ]
-        };
-        
-        // Buat blob URL untuk manifest
-        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-        const manifestUrl = URL.createObjectURL(manifestBlob);
-        
-        // Buat link element untuk manifest
-        const linkElement = document.createElement('link');
-        linkElement.rel = 'manifest';
-        linkElement.href = manifestUrl;
-        document.head.appendChild(linkElement);
-    </script>
+    <!-- Wajib: link ke file manifest.json (letakkan di folder yang sama) -->
+    <link rel="manifest" href="manifest.json">
 
+    <!-- Script: Service Worker + Install Prompt (BERSIH & TIDAK DUPLIKAT) -->
     <script>
-        // Registrasi Service Worker
+        // 1. Registrasi Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
@@ -59,10 +24,10 @@
             });
         }
 
-        // Prompt Install PWA (hanya sekali deklarasi)
+        // 2. Tangkap event install dan tampilkan banner kustom
         let deferredPrompt;
         const showInstallBanner = () => {
-            // Hindari menampilkan banner lagi jika sudah ada
+            // Hindari duplikasi banner
             if (document.getElementById('install-banner')) return;
 
             const installBanner = document.createElement('div');
@@ -79,6 +44,7 @@
             `;
             document.body.appendChild(installBanner);
 
+            // Tombol pasang
             document.getElementById('install-btn').addEventListener('click', async () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
@@ -89,19 +55,20 @@
                 }
             });
 
+            // Tombol silang
             document.getElementById('dismiss-btn').addEventListener('click', () => {
                 installBanner.remove();
             });
         };
 
-        // Tangkap event beforeinstallprompt
+        // 3. Event beforeinstallprompt
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault(); // Tahan prompt native
-            deferredPrompt = e; // Simpan event untuk nanti
-            showInstallBanner(); // Tampilkan banner custom
+            e.preventDefault(); // Tahan dialog bawaan Chrome
+            deferredPrompt = e;  // Simpan event agar bisa dipanggil nanti
+            showInstallBanner(); // Tampilkan popup buatan sendiri
         });
 
-        // Sembunyikan banner jika aplikasi sudah terinstal
+        // 4. Jika sudah terinstal, hapus banner
         window.addEventListener('appinstalled', () => {
             const banner = document.getElementById('install-banner');
             if (banner) banner.remove();
@@ -109,7 +76,7 @@
         });
     </script>
 
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
