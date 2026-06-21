@@ -10,7 +10,6 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>POS Mi Ayam Abun</title>
 
-    <!-- PWA Manifest -->
     <script>
         const manifestJSON = {
             "name": "POS Mi Ayam Abun Pro",
@@ -71,12 +70,10 @@
         }
     </script>
 
-    <!-- CDN Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 
-    <!-- ES Modules Import Map -->
     <script type="importmap">
         {
             "imports": {
@@ -89,9 +86,9 @@
     </script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-[#333] m-0 p-0 overflow-hidden w-full h-[100dvh]">
+<body class="bg-[#333] m-0 p-0 overflow-hidden w-full min-h-[100dvh]">
 
-    <div id="root" class="w-full h-full max-w-md bg-white shadow-2xl relative overflow-hidden flex flex-col mx-auto"></div>
+    <div id="root" class="w-full h-[100dvh] max-w-md bg-white shadow-2xl relative overflow-hidden flex flex-col mx-auto"></div>
 
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
@@ -109,6 +106,7 @@
         const MENU_DATABASE = [
             { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: Utensils, addons: [] },
             { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: Utensils, addons: [] },
+            { id: 'm3', category: 'Makanan', name: 'Tempe Kemul/4 Pcs', price: 5000, icon: Utensils, addons: [] },
             { id: 'b1', category: 'Minuman', name: 'Teh Standar', price: 4000, icon: Coffee,
                 addons: [ { id: 'ice', name: 'Ice / Dingin', price: 0, group: 'temperature' }, { id: 'hot', name: 'Hot / Panas', price: 0, group: 'temperature' } ]
             },
@@ -238,17 +236,6 @@
             useEffect(() => { localStorage.setItem('pos_cart', JSON.stringify(cart)); }, [cart]);
             useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
 
-            useEffect(() => {
-                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-                return () => clearInterval(timer);
-            }, []);
-
-            useEffect(() => {
-                const t1 = setTimeout(() => setSplashState('fading'), 2000);
-                const t2 = setTimeout(() => setSplashState('hidden'), 2500);
-                return () => { clearTimeout(t1); clearTimeout(t2); };
-            }, []);
-
             const [discount, setDiscount] = useState({ type: 'nominal', value: 0 });
             const [isCartOpen, setIsCartOpen] = useState(false);
             const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
@@ -260,6 +247,17 @@
             const [receiptData, setReceiptData] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
             const [selectedCategory, setSelectedCategory] = useState('Semua');
+
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            useEffect(() => {
+                const t1 = setTimeout(() => setSplashState('fading'), 2000);
+                const t2 = setTimeout(() => setSplashState('hidden'), 2500);
+                return () => { clearTimeout(t1); clearTimeout(t2); };
+            }, []);
 
             const showToast = (message, type = 'success') => {
                 const id = Date.now();
@@ -375,20 +373,7 @@
                 });
             };
 
-            const processTransaction = (paymentDetails) => {
-                const newTransaction = {
-                    id: generateInvoiceNo(), timestamp: new Date().toISOString(), cart: [...cart],
-                    orderInfo: { ...orderInfo }, calculations: cartCalculations, payment: paymentDetails, cashier: 'Admin',
-                };
-                setTransactions(prev => [newTransaction, ...prev]);
-                if (storeConfig.autoPrint) handlePrintOrJPG(newTransaction);
-                setCart([]);
-                setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' });
-                setDiscount({ type: 'nominal', value: 0 });
-                setIsCheckoutOpen(false); setIsCartOpen(false);
-                showToast('Transaksi Berhasil!', 'success');
-            };
-
+            // Penempatan fungsi ini di atur SEBELUM processTransaction untuk menghindari ReferenceError
             const handlePrintOrJPG = (trx) => {
                 setReceiptData(trx);
                 if (storeConfig.receiptMode === 'jpg') {
@@ -446,6 +431,61 @@
                 XLSX.writeFile(wb, `Laporan_${period}.xlsx`); showToast(`Berhasil ekspor Excel`, 'success');
             };
 
+            const handleBackup = () => {
+                const data = { storeConfig, transactions, holdOrders };
+                const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `Backup_POS_Abun_${new Date().toISOString().slice(0,10)}.json`;
+                link.click();
+                showToast('Backup berhasil diunduh', 'success');
+            };
+
+            const handleRestore = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.storeConfig) setStoreConfig(data.storeConfig);
+                        if (data.transactions) setTransactions(data.transactions);
+                        if (data.holdOrders) setHoldOrders(data.holdOrders);
+                        showToast('Data berhasil direstore!', 'success');
+                    } catch (err) { showToast('Format file tidak valid!', 'error'); }
+                };
+                reader.readAsText(file);
+            };
+
+            const handleResetApp = () => {
+                setDialog({
+                    type: 'confirm',
+                    title: 'Reset Aplikasi',
+                    message: 'Seluruh data transaksi dan pengaturan akan dihapus secara permanen. Lanjutkan?',
+                    onConfirm: () => { localStorage.clear(); window.location.reload(); },
+                });
+                setIsHeaderMenuOpen(false);
+            };
+
+            const processTransaction = (paymentDetails) => {
+                const newTransaction = {
+                    id: generateInvoiceNo(), timestamp: new Date().toISOString(), cart: [...cart],
+                    orderInfo: { ...orderInfo }, calculations: cartCalculations, payment: paymentDetails, cashier: 'Admin',
+                };
+                setTransactions(prev => [newTransaction, ...prev]);
+                
+                // Print struk otomatis bila disetting
+                if (storeConfig.autoPrint) handlePrintOrJPG(newTransaction);
+                
+                // Clear cart dan tutup pop-up
+                setCart([]);
+                setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' });
+                setDiscount({ type: 'nominal', value: 0 });
+                setIsCheckoutOpen(false); 
+                setIsCartOpen(false);
+                showToast('Transaksi Berhasil!', 'success');
+            };
+
             const renderSplashScreen = () => {
                 if (splashState === 'hidden') return null;
                 return (
@@ -461,7 +501,7 @@
 
             const renderShiftGate = () => {
                 return (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-white z-[35] animate-fade-in text-center print:hidden">
+                    <div className="h-full w-full flex flex-col items-center justify-center p-6 bg-white z-[35] animate-fade-in text-center print:hidden">
                         <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-inner border border-gray-100">
                             <Store className="w-10 h-10 text-[#9A1C1F]" />
                         </div>
@@ -495,7 +535,7 @@
                 const avgOrder = totalOrders > 0 ? totalSales / totalOrders : 0;
                 
                 return (
-                    <div className="absolute inset-0 flex flex-col animate-fade-in overflow-y-auto pb-24 p-4 space-y-6">
+                    <div className="h-full w-full overflow-y-auto animate-fade-in p-4 pb-28 space-y-6">
                         <div className="bg-[#9A1C1F] text-white p-6 rounded-3xl shadow-xl relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-4 opacity-10"><Store className="w-32 h-32" /></div>
                             <h2 className="text-sm font-medium opacity-80 mb-1">Pendapatan Hari Ini</h2>
@@ -511,6 +551,7 @@
                             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
                                 <button onClick={() => exportExcel('hari')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100"><FileSpreadsheet className="w-3 h-3" /> Hari Ini</button>
                                 <button onClick={() => exportExcel('minggu')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100"><FileSpreadsheet className="w-3 h-3" /> Minggu Ini</button>
+                                <button onClick={() => exportExcel('bulan')} className="px-3 py-2 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-xl whitespace-nowrap flex items-center gap-1 border border-emerald-100"><FileSpreadsheet className="w-3 h-3" /> Bulan Ini</button>
                             </div>
                         </div>
 
@@ -519,6 +560,7 @@
                                 <div className="bg-orange-100 w-10 h-10 rounded-xl flex items-center justify-center text-orange-600 mb-3"><Clock className="w-5 h-5" /></div>
                                 <p className="text-xs text-gray-500 font-medium">Status Shift</p>
                                 <p className="font-bold text-gray-800">{ shift.isOpen ? 'Buka' : 'Tutup' }</p>
+                                { !shift.isOpen && <Button variant="outline" className="mt-3 text-xs py-1.5 px-2" onClick={ promptBukaShift }>Buka Shift</Button>}
                             </div>
                             <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 cursor-pointer" onClick={() => setActiveTab('history')}>
                                 <div className="bg-emerald-100 w-10 h-10 rounded-xl flex items-center justify-center text-emerald-600 mb-3"><Save className="w-5 h-5" /></div>
@@ -535,7 +577,7 @@
                 const filteredMenu = MENU_DATABASE.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()) && (selectedCategory === 'Semua' || item.category === selectedCategory));
 
                 return (
-                    <div className="absolute inset-0 flex flex-col animate-fade-in">
+                    <div className="h-full w-full flex flex-col animate-fade-in relative">
                         <div className="p-4 bg-white z-10 shadow-sm shrink-0">
                             <div className="relative mb-3">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -548,7 +590,7 @@
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-[90px]">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-28">
                             { [...new Set(filteredMenu.map(i => i.category))].map(category => {
                                 const categoryItems = filteredMenu.filter(i => i.category === category);
                                 if (categoryItems.length === 0) return null;
@@ -577,7 +619,7 @@
                         </div>
 
                         { cartCalculations.totalItems > 0 && (
-                            <div className="absolute bottom-[80px] left-0 right-0 px-4 z-20">
+                            <div className="absolute bottom-4 left-0 right-0 px-4 z-20">
                                 <button onClick={() => setIsCartOpen(true)} className="w-full bg-[#9A1C1F] text-white p-4 rounded-2xl shadow-xl shadow-[#9A1C1F]/30 flex items-center justify-between animate-popup transition-transform active:scale-[0.98]">
                                     <div className="flex items-center gap-3"><div className="bg-white/20 px-3 py-1.5 rounded-xl font-bold text-sm">{ cartCalculations.totalItems } Item</div><span className="font-medium text-sm">Lihat Keranjang</span></div>
                                     <p className="font-bold text-lg">{ formatRp(cartCalculations.grandTotal) }</p>
@@ -590,7 +632,7 @@
 
             const renderHistory = () => {
                 return (
-                    <div className="absolute inset-0 flex flex-col animate-fade-in overflow-y-auto p-4 pb-24 space-y-6">
+                    <div className="h-full w-full overflow-y-auto animate-fade-in p-4 pb-28 space-y-6">
                         <h2 className="text-xl font-bold text-gray-800">Riwayat Transaksi</h2>
                         { holdOrders.length > 0 && (
                             <section className="animate-slide-up">
@@ -628,7 +670,7 @@
 
             const renderSettings = () => {
                 return (
-                    <div className="absolute inset-0 flex flex-col animate-fade-in overflow-y-auto p-4 pb-24 space-y-6">
+                    <div className="h-full w-full overflow-y-auto animate-fade-in p-4 pb-32 space-y-6">
                         <h2 className="text-xl font-bold text-gray-800 mb-4">Pengaturan Sistem</h2>
                         
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4 animate-slide-up">
@@ -658,9 +700,9 @@
                             <div className="p-4 border-b border-gray-100 flex items-center gap-3 bg-gray-50"><div className="w-10 h-10 bg-white rounded-full flex items-center justify-center"><Database className="w-5 h-5 text-emerald-500" /></div><h3 className="font-bold text-gray-800">Data (Backup)</h3></div>
                             <div className="p-4">
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Button variant="outline" className="w-full text-xs py-2.5" onClick={() => { const blob = new Blob([JSON.stringify({ storeConfig, transactions, holdOrders })], { type: "application/json" }); const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Backup_POS_${new Date().toISOString().slice(0,10)}.json`; link.click(); showToast('Backup berhasil', 'success'); }}><Download className="w-4 h-4" /> Backup</Button>
+                                    <Button variant="outline" className="w-full text-xs py-2.5" onClick={handleBackup}><Download className="w-4 h-4" /> Backup</Button>
                                     <label className="w-full flex items-center justify-center gap-2 font-bold rounded-xl transition-all bg-[#9A1C1F]/10 text-[#9A1C1F] hover:bg-[#9A1C1F]/20 py-2.5 px-4 text-xs cursor-pointer"><UploadCloud className="w-4 h-4" /> Restore
-                                        <input type="file" accept=".json" className="hidden" onChange={(e) => { const file = e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = (event) => { try { const data = JSON.parse(event.target.result); if(data.storeConfig) setStoreConfig(data.storeConfig); if(data.transactions) setTransactions(data.transactions); if(data.holdOrders) setHoldOrders(data.holdOrders); showToast('Data direstore!', 'success'); } catch (err) { showToast('Format salah!', 'error'); } }; reader.readAsText(file); }} />
+                                        <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleRestore} />
                                     </label>
                                 </div>
                             </div>
@@ -676,7 +718,7 @@
                 let currentPrice = item.price + selectedAddons.reduce((s, a) => s + a.price, 0);
 
                 return (
-                    <div className="absolute inset-0 z-[60] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+                    <div className="absolute inset-0 z-[80] flex items-center justify-center px-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
                         <div className="bg-white w-full max-w-sm rounded-3xl flex flex-col max-h-[85dvh] shadow-2xl overflow-hidden animate-popup">
                             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 shrink-0">
                                 <h3 className="font-bold text-lg">{ item.name }</h3>
@@ -720,7 +762,7 @@
             const renderCart = () => {
                 if (!isCartOpen) return null;
                 return (
-                    <div className="absolute inset-0 z-40 flex flex-col bg-gray-50 animate-slide-up print:hidden">
+                    <div className="absolute inset-0 z-[70] flex flex-col bg-gray-50 animate-slide-up print:hidden">
                         <div className="bg-white px-4 py-4 flex items-center justify-between border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)] shrink-0">
                             <div className="flex items-center gap-3"><button onClick={() => setIsCartOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button><h2 className="font-bold text-lg text-gray-800">Detail Pesanan</h2></div>
                             <button onClick={clearCart} className="text-xs font-bold text-red-500 bg-red-50 px-2 py-1.5 rounded-lg active:scale-95 transition-all flex items-center gap-1"><Trash2 className="w-4 h-4"/> Kosongkan</button>
@@ -780,7 +822,7 @@
                 const isReadyToPay = checkoutMethod !== 'cash' || (checkoutMethod === 'cash' && Number(cashGiven) >= amountToPay);
 
                 return (
-                    <div className="absolute inset-0 z-50 flex flex-col bg-gray-50 animate-slide-up print:hidden">
+                    <div className="absolute inset-0 z-[70] flex flex-col bg-gray-50 animate-slide-up print:hidden">
                         <div className="bg-white px-4 py-4 flex items-center gap-3 border-b shadow-sm pt-[max(env(safe-area-inset-top),1rem)] shrink-0"><button onClick={() => setIsCheckoutOpen(false)} className="p-2 -ml-2 text-gray-600 active:scale-95 transition-all"><ArrowLeft className="w-6 h-6" /></button><h2 className="font-bold text-lg text-gray-800">Pembayaran</h2></div>
                         <div className="flex-1 overflow-y-auto pb-24 bg-gray-50">
                             <div className="bg-[#9A1C1F] text-white p-6 text-center shadow-inner"><p className="text-sm opacity-80 mb-1">Total Tagihan</p><p className="text-4xl font-black tracking-tight">{ formatRp(amountToPay) }</p></div>
@@ -816,7 +858,7 @@
             const renderBottomNav = () => {
                 const navItems = [ { id: 'dashboard', label: 'Home', icon: Home }, { id: 'pos', label: 'Kasir', icon: LayoutGrid }, { id: 'history', label: 'Riwayat', icon: History }, { id: 'settings', label: 'Setelan', icon: Settings } ];
                 return (
-                    <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around px-2 py-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] z-30 print:hidden shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)]">
+                    <div className="shrink-0 bg-white border-t border-gray-200 flex justify-around px-2 py-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] z-30 print:hidden shadow-[0_-5px_15px_-5px_rgba(0,0,0,0.05)] relative">
                         { navItems.map(item => {
                             const isActive = activeTab === item.id;
                             return (
@@ -833,7 +875,7 @@
             const renderDialog = () => {
                 if (!dialog) return null;
                 return (
-                    <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in">
+                    <div className="absolute inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in">
                         <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
                             <h3 className="text-xl font-bold text-gray-800 mb-2">{ dialog.title }</h3>
                             { dialog.message && <p className="text-sm text-gray-600 mb-5 leading-relaxed whitespace-pre-wrap">{ dialog.message }</p>}
@@ -880,8 +922,8 @@
                 <div className="w-full h-full relative flex flex-col overflow-hidden font-sans text-gray-800 bg-white">
                     { renderSplashScreen() }
 
-                    <header className="bg-[#9A1C1F] text-[#F9F6F0] p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative overflow-hidden transition-all duration-300">
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
+                    <header className="bg-[#9A1C1F] text-[#F9F6F0] p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-[60] shrink-0 print:hidden relative transition-all duration-300">
+                        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
                         <div className="flex items-center gap-3 relative z-10">
                             <HeaderLogo />
                             <div>
@@ -899,9 +941,11 @@
                             </div>
                         </div>
                         <div className="relative z-20">
-                            <button onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition-colors relative z-10"><MoreVertical className="w-5 h-5" /></button>
+                            <button onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition-colors relative z-10">
+                                <MoreVertical className="w-5 h-5" />
+                            </button>
                             { isHeaderMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100 py-1 text-gray-800 animate-slide-up origin-top-right">
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 text-gray-800 animate-slide-up origin-top-right z-[100]">
                                     <button onClick={handleResetApp} className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 flex items-center gap-2 text-red-600 font-bold transition-colors"><AlertCircle className="w-4 h-4" /> Reset Data Aplikasi</button>
                                     <div className="border-b border-gray-100"></div>
                                     <button onClick={() => window.location.reload()} className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-bold transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Muat Ulang</button>
@@ -910,7 +954,7 @@
                         </div>
                     </header>
 
-                    <main className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 print:hidden" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
+                    <main className="flex-1 relative flex flex-col bg-gray-50 print:hidden overflow-hidden" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
                         { !shift.isOpen && activeTab !== 'settings' ? renderShiftGate() : (
                             <>
                                 { activeTab === 'dashboard' && renderDashboard() }
