@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Mi Ayam Abun">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>POS Mi Ayam Abun</title>
+    <title>Mi Ayam Abun</title>
 
     <!-- Wajib: link ke file manifest.json (letakkan di folder yang sama) -->
     <link rel="manifest" href="manifest.json">
@@ -409,7 +409,7 @@
                 if (trx.calculations.serviceAmount > 0) text += `Layanan: ${formatRp(trx.calculations.serviceAmount)}\n`;
                 text += `*TOTAL TAGIHAN: ${formatRp(trx.calculations.grandTotal)}*\n`;
                 text += `Pembayaran: ${trx.payment.method.toUpperCase()}\n\n`;
-                text += `Terima kasih atas kunjungannya! 😊`;
+                text += `Terima kasih atas kunjungannya!😊`;
                 const waLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
                 window.open(waLink, '_blank');
             };
@@ -566,7 +566,7 @@
                         <div className="flex flex-col items-center animate-pulse">
                             <img src="abun500.png" alt="Logo" className="w-32 h-32 object-contain mb-6 drop-shadow-lg" onerror="this.style.display='none'"/>
                             <h1 className="text-3xl font-black text-white tracking-widest drop-shadow-md">{ storeConfig.appName }</h1>
-                            <p className="text-white/80 text-xs mt-2 tracking-widest">SISTEM KASIR PRO V6</p>
+                            <p className="text-white/80 text-xs mt-2 tracking-widest">SISTEM KASIR BY ZULFA ZAIN</p>
                             <div className="mt-12 flex gap-3">
                                 <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce"></div>
                                 <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -673,7 +673,7 @@
 
                             <div className="mt-8 text-center pb-4 opacity-70">
                                 <div className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-gray-100 border border-gray-200">
-                                    <span className="text-[10px] font-bold text-gray-500">✨ Pro System V6.0</span>
+                                    <span className="text-[10px] font-bold text-gray-500">✨ Dibuat Oleh Zulfa Zain</span>
                                 </div>
                             </div>
                         </div>
