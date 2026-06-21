@@ -10,32 +10,120 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>POS Mi Ayam Abun</title>
 
-<link rel="manifest" href="manifest.json">
+    <!-- Manifest JSON untuk PWA -->
+    <script>
+        // Buat manifest secara dinamis jika file tidak ada
+        const manifest = {
+            name: "Mi Ayam Abun POS",
+            short_name: "Mi Ayam Abun",
+            description: "Sistem Kasir Mi Ayam Abun",
+            start_url: ".",
+            display: "standalone",
+            background_color: "#9A1C1F",
+            theme_color: "#9A1C1F",
+            orientation: "portrait",
+            icons: [
+                {
+                    src: "abun200.png",
+                    sizes: "192x192",
+                    type: "image/png",
+                    purpose: "any maskable"
+                },
+                {
+                    src: "abun500.png",
+                    sizes: "512x512",
+                    type: "image/png",
+                    purpose: "any maskable"
+                }
+            ]
+        };
+        
+        // Buat blob URL untuk manifest
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        
+        // Buat link element untuk manifest
+        const linkElement = document.createElement('link');
+        linkElement.rel = 'manifest';
+        linkElement.href = manifestUrl;
+        document.head.appendChild(linkElement);
+    </script>
 
+    <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
+                // Buat service worker secara dinamis
+                const swCode = `
+                    const CACHE_NAME = 'mi-ayam-abun-v6';
+                    const urlsToCache = [
+                        './',
+                        './index.html',
+                        './abun200.png',
+                        './abun500.png'
+                    ];
+
+                    self.addEventListener('install', event => {
+                        event.waitUntil(
+                            caches.open(CACHE_NAME)
+                                .then(cache => cache.addAll(urlsToCache))
+                                .then(() => self.skipWaiting())
+                        );
+                    });
+
+                    self.addEventListener('activate', event => {
+                        event.waitUntil(
+                            caches.keys().then(cacheNames => {
+                                return Promise.all(
+                                    cacheNames.filter(name => name !== CACHE_NAME)
+                                        .map(name => caches.delete(name))
+                                );
+                            }).then(() => self.clients.claim())
+                        );
+                    });
+
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request)
+                                .then(response => response || fetch(event.request))
+                        );
+                    });
+                `;
+                
+                const swBlob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(swBlob);
+                
+                navigator.serviceWorker.register(swUrl)
                     .then(reg => console.log('✅ Service Worker terdaftar!', reg.scope))
                     .catch(err => console.warn('⚠️ Service Worker gagal:', err));
             });
         }
+    </script>
 
-        // Tampilkan prompt install native Android
+    <!-- Install Prompt Handler - HANYA SATU -->
+    <script>
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
+            // Cegah prompt otomatis
             e.preventDefault();
+            // Simpan event untuk digunakan nanti
             deferredPrompt = e;
+            
+            // Hapus banner lama jika ada
+            const existingBanner = document.getElementById('install-banner');
+            if (existingBanner) existingBanner.remove();
             
             // Buat banner pop-up instalasi custom
             const installBanner = document.createElement('div');
             installBanner.id = 'install-banner';
             installBanner.className = 'fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 z-[300] flex items-center gap-3 animate-slide-up border border-gray-200 max-w-md mx-auto';
             installBanner.innerHTML = `
-                <img src="abun200.png" class="w-10 h-10 object-contain rounded-lg" alt="Logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjwvc3ZnPg=='"/>
+                <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
+                    <img src="abun200.png" class="w-8 h-8 object-contain" alt="Logo" onerror="this.style.display='none'"/>
+                </div>
                 <div class="flex-1">
-                  <p class="font-bold text-sm text-gray-800">Pasang Aplikasi</p>
-                  <p class="text-xs text-gray-500">Simpan Mi Ayam Abun di layar utama</p>
+                    <p class="font-bold text-sm text-gray-800">Pasang Aplikasi</p>
+                    <p class="text-xs text-gray-500">Simpan Mi Ayam Abun di layar utama</p>
                 </div>
                 <button id="install-btn" class="bg-[#9A1C1F] text-white px-4 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all">Pasang</button>
                 <button id="dismiss-btn" class="text-gray-400 p-2 active:scale-95 transition-all">✕</button>
@@ -59,7 +147,7 @@
             });
         });
 
-        // Sembunyikan banner jika aplikasi sudah terinstal (berjalan dalam mode standalone)
+        // Sembunyikan banner jika aplikasi sudah terinstal
         window.addEventListener('appinstalled', () => {
             const banner = document.getElementById('install-banner');
             if (banner) banner.remove();
@@ -67,35 +155,7 @@
         });
     </script>
 
-            // Tampilkan prompt install native
-            let deferredPrompt;
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                const installBanner = document.createElement('div');
-                installBanner.id = 'install-banner';
-                installBanner.className = 'fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 z-[300] flex items-center gap-3 animate-slide-up border border-gray-200 max-w-md mx-auto';
-                installBanner.innerHTML = `
-                <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center shrink-0">
-                    <img src="abun200.png" class="w-8 h-8 object-contain" alt="Logo" onerror="this.style.display='none'"/>
-                </div>
-                <div class="flex-1">
-                  <p class="font-bold text-sm text-gray-800">Pasang Aplikasi POS</p>
-                  <p class="text-xs text-gray-500">Simpan aplikasi di layar utama HP</p>
-                </div>
-                <button id="install-btn" class="bg-theme text-white px-4 py-2 rounded-xl font-bold text-sm active:scale-95 transition-all">Pasang</button>
-                <button id="dismiss-btn" class="text-gray-400 p-2 active:scale-95 transition-all">✕</button>
-              `;
-                document.body.appendChild(installBanner);
-                document.getElementById('install-btn').addEventListener('click', () => {
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(() => { deferredPrompt = null; installBanner.remove(); });
-                });
-                document.getElementById('dismiss-btn').addEventListener('click', () => installBanner.remove());
-            });
-        }
-    </script>
-
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -109,6 +169,8 @@
             }
         }
     </script>
+    
+    <!-- Library Eksternal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 
@@ -125,7 +187,6 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 
-<!-- Hapus items-center agar tidak pipih, biarkan merentang penuh 100dvh -->
 <body class="bg-[#222] m-0 p-0 overflow-hidden flex justify-center min-h-[100dvh] w-full font-sans text-gray-800">
 
     <div id="root" class="w-full h-[100dvh] max-w-md bg-white shadow-2xl relative overflow-hidden flex flex-col mx-auto transition-colors duration-500"></div>
