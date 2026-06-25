@@ -8,14 +8,13 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Mi Ayam Abun">
     <meta name="mobile-web-app-capable" content="yes">
-    <title>Mi Ayam Abun</title>
+    <title>POS Mi Ayam Abun</title>
 
-    <!-- Wajib: link ke file manifest.json (letakkan di folder yang sama) -->
+    <!-- Wajib: link ke file manifest.json -->
     <link rel="manifest" href="manifest.json">
 
     <!-- Script: Service Worker + Install Prompt (BERSIH & TIDAK DUPLIKAT) -->
     <script>
-        // 1. Registrasi Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
@@ -24,12 +23,9 @@
             });
         }
 
-        // 2. Tangkap event install dan tampilkan banner kustom
         let deferredPrompt;
         const showInstallBanner = () => {
-            // Hindari duplikasi banner
             if (document.getElementById('install-banner')) return;
-
             const installBanner = document.createElement('div');
             installBanner.id = 'install-banner';
             installBanner.className = 'fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 z-[300] flex items-center gap-3 animate-slide-up border border-gray-200 max-w-md mx-auto';
@@ -43,8 +39,6 @@
                 <button id="dismiss-btn" class="text-gray-400 p-2 active:scale-95 transition-all">✕</button>
             `;
             document.body.appendChild(installBanner);
-
-            // Tombol pasang
             document.getElementById('install-btn').addEventListener('click', async () => {
                 if (deferredPrompt) {
                     deferredPrompt.prompt();
@@ -54,21 +48,17 @@
                     installBanner.remove();
                 }
             });
-
-            // Tombol silang
             document.getElementById('dismiss-btn').addEventListener('click', () => {
                 installBanner.remove();
             });
         };
 
-        // 3. Event beforeinstallprompt
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault(); // Tahan dialog bawaan Chrome
-            deferredPrompt = e;  // Simpan event agar bisa dipanggil nanti
-            showInstallBanner(); // Tampilkan popup buatan sendiri
+            e.preventDefault();
+            deferredPrompt = e;
+            showInstallBanner();
         });
 
-        // 4. Jika sudah terinstal, hapus banner
         window.addEventListener('appinstalled', () => {
             const banner = document.getElementById('install-banner');
             if (banner) banner.remove();
@@ -90,70 +80,42 @@
             }
         }
     </script>
-    
+
+    <!-- Proteksi copy-paste (kecuali input) -->
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Mencegah klik kanan (context menu)
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-            return false;
-        });
-
-        // Mencegah seleksi teks dengan mouse
-        document.addEventListener('selectstart', function(e) {
-            e.preventDefault();
-            return false;
-        });
-
-        // Mencegah copy, cut, paste (kecuali di input/textarea)
-        function isInputFocused() {
-            const tag = document.activeElement.tagName;
-            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable;
-        }
-
-        document.addEventListener('copy', function(e) {
-            if (!isInputFocused()) {
-                e.preventDefault();
-                return false;
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('contextmenu', e => e.preventDefault());
+            document.addEventListener('selectstart', e => {
+                if (!isInputFocused()) e.preventDefault();
+            });
+            function isInputFocused() {
+                const tag = document.activeElement.tagName;
+                return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable;
             }
+            ['copy', 'cut', 'paste'].forEach(ev => {
+                document.addEventListener(ev, e => {
+                    if (!isInputFocused()) e.preventDefault();
+                });
+            });
+            document.addEventListener('dragstart', e => e.preventDefault());
+            document.addEventListener('keydown', e => {
+                if (isInputFocused()) return;
+                const key = e.keyCode;
+                const ctrl = e.ctrlKey || e.metaKey;
+                const shift = e.shiftKey;
+                if (key === 123) { e.preventDefault(); return false; }
+                if (ctrl) {
+                    if (key === 67 || key === 88 || key === 86 || key === 85 || key === 83 || key === 80) {
+                        e.preventDefault(); return false;
+                    }
+                    if (shift && (key === 73 || key === 74 || key === 67)) {
+                        e.preventDefault(); return false;
+                    }
+                }
+            });
         });
-        document.addEventListener('cut', function(e) {
-            if (!isInputFocused()) {
-                e.preventDefault();
-                return false;
-            }
-        });
-        document.addEventListener('paste', function(e) {
-            if (!isInputFocused()) {
-                e.preventDefault();
-                return false;
-            }
-        });
+    </script>
 
-        // Mencegah drag gambar/link
-        document.addEventListener('dragstart', function(e) {
-            e.preventDefault();
-            return false;
-        });
-
-        // Mencegah shortcut keyboard berbahaya
-        document.addEventListener('keydown', function(e) {
-            if (isInputFocused()) return; // izinkan di input
-
-            // F12, Ctrl+Shift+I/J/C, Ctrl+U, Ctrl+S, Ctrl+P, Ctrl+C, Ctrl+X, Ctrl+V
-            const forbidden = 
-                e.keyCode === 123 || // F12
-                (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) ||
-                (e.ctrlKey && (e.keyCode === 85 || e.keyCode === 83 || e.keyCode === 80 || e.keyCode === 67 || e.keyCode === 88 || e.keyCode === 86));
-
-            if (forbidden) {
-                e.preventDefault();
-                return false;
-            }
-        });
-    });
-</script>
-    
     <!-- Library Eksternal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
@@ -192,7 +154,6 @@
             { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: Utensils, addons: [] },
             { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: Utensils, addons: [] },
             { id: 'm3', category: 'Makanan', name: 'Tempe Kemul/4 Pcs', price: 5000, icon: Utensils, addons: [] },
-            
             { id: 'b1', category: 'Minuman', name: 'Teh Standar', price: 4000, icon: Coffee, addons: [{ id: 'ice', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot', name: 'Hot / Panas', price: 0, group: 'temp' }] },
             { id: 'b2', category: 'Minuman', name: 'Teh Jumbo', price: 6000, icon: Coffee, addons: [{ id: 'ice-j', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-j', name: 'Hot / Panas', price: 0, group: 'temp' }] },
             { id: 'b3', category: 'Minuman', name: 'Jeruk', price: 6000, icon: Coffee, addons: [{ id: 'ice-jr', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-jr', name: 'Hot / Panas', price: 0, group: 'temp' }] },
@@ -215,7 +176,6 @@
             { id: 'qris', name: 'QRIS', icon: QrCode },
         ];
 
-        // Definisi Tema Warna
         const THEMES = [
             { id: 'merah', name: 'Merah Abun', color: '#9A1C1F', hover: '#7a1518' },
             { id: 'hijau', name: 'Hijau Fresh', color: '#10B981', hover: '#059669' },
@@ -227,13 +187,13 @@
         const DEFAULT_STORE_CONFIG = {
             appName: 'Mi Ayam Abun',
             instagram: '@miayamabun.id',
-            address: 'Dusun IV Kalibagor, Kec.Kalibagor, Kab.Banyumas, Jawa Tengah 53191',
+            address: 'Grumbul Kedung Bunder, Kec.Kalibagor, Kab.Banyumas, Jawa Tengah 53191',
             phone: '085848791020',
             taxRate: 0,
             serviceCharge: 0,
             receiptMode: 'thermal',
             qrisMerchantId: 'ID026533909051',
-            themeId: 'merah' // Tema default
+            themeId: 'merah'
         };
 
         const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
@@ -244,7 +204,6 @@
         };
         const formatDate = (dateString) => new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-        // Komponen Tombol yang mengikuti warna Tema (bg-theme)
         const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, icon: Icon }) => {
             const baseStyle = "flex items-center justify-center gap-2 font-bold rounded-xl transition-all duration-150 active:scale-[0.94] disabled:opacity-50 disabled:active:scale-100 overflow-hidden relative select-none";
             const variants = {
@@ -255,7 +214,6 @@
                 danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 py-3 px-4",
                 success: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg py-3 px-4",
             };
-
             return (
                 <button onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
                     { Icon && <Icon className="w-5 h-5" /> } { children }
@@ -263,13 +221,11 @@
             );
         };
 
-        // Komponen Toast Pintar (Diperbaiki: Tidak lagi reset timer karena dependency array kosong)
         const Toast = ({ message, type = 'success', onClose }) => {
             useEffect(() => { 
                 const timer = setTimeout(() => { onClose(); }, 2500); 
                 return () => clearTimeout(timer); 
-            }, []); // <-- Array kosong ini kunci agar toast tidak stuck!
-
+            }, []);
             const bg = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
             const Icon = type === 'success' ? CheckCircle : type === 'error' ? AlertCircle : Info;
             return (
@@ -289,15 +245,13 @@
             const receiptRef = useRef(null);
             const fileInputRef = useRef(null);
             
-            // State Navigasi
             const [activeTab, setActiveTab] = useState('pos');
             const [toasts, setToasts] = useState([]);
             const [dialog, setDialog] = useState(null);
             const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
             const [splashState, setSplashState] = useState('visible');
-            const [currentTime, setCurrentTime] = useState(new Date()); // State Waktu Realtime
+            const [currentTime, setCurrentTime] = useState(new Date());
 
-            // State Local Storage Database
             const [storeConfig, setStoreConfig] = useState(() => {
                 const saved = localStorage.getItem('pos_config');
                 return saved ? { ...DEFAULT_STORE_CONFIG, ...JSON.parse(saved) } : DEFAULT_STORE_CONFIG;
@@ -323,7 +277,6 @@
                 return saved ? JSON.parse(saved) : { customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' };
             });
 
-            // Effect: Menyimpan data otomatis ke Local Storage
             useEffect(() => { localStorage.setItem('pos_config', JSON.stringify(storeConfig)); }, [storeConfig]);
             useEffect(() => { localStorage.setItem('pos_transactions', JSON.stringify(transactions)); }, [transactions]);
             useEffect(() => { localStorage.setItem('pos_hold', JSON.stringify(holdOrders)); }, [holdOrders]);
@@ -331,26 +284,19 @@
             useEffect(() => { localStorage.setItem('pos_cart', JSON.stringify(cart)); }, [cart]);
             useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
 
-            // Effect: Mengganti Variabel CSS Tema Warna
             useEffect(() => {
                 const theme = THEMES.find(t => t.id === storeConfig.themeId) || THEMES[0];
                 document.documentElement.style.setProperty('--theme-color', theme.color);
                 document.documentElement.style.setProperty('--theme-hover', theme.hover);
             }, [storeConfig.themeId]);
 
-            // Effect: Jam Berdetak (Realtime) & Splash Screen
             useEffect(() => {
-                // Timer Splash
                 const t1 = setTimeout(() => setSplashState('fading'), 1500);
                 const t2 = setTimeout(() => setSplashState('hidden'), 2000);
-                
-                // Timer Jam
                 const clockTimer = setInterval(() => setCurrentTime(new Date()), 1000);
-                
                 return () => { clearTimeout(t1); clearTimeout(t2); clearInterval(clockTimer); };
             }, []);
 
-            // State POS Aktif
             const [discount, setDiscount] = useState({ type: 'nominal', value: 0 });
             const [isCartOpen, setIsCartOpen] = useState(false);
             const [selectedItemForAddon, setSelectedItemForAddon] = useState(null);
@@ -434,7 +380,7 @@
             };
 
             const handlePrintOrJPG = (trx) => {
-                setReceiptData(trx); // Tampilkan struk off-screen
+                setReceiptData(trx);
                 if (storeConfig.receiptMode === 'jpg') {
                     showToast('Menyiapkan file JPG...', 'info');
                     setTimeout(async () => {
@@ -448,7 +394,7 @@
                         } catch (err) { showToast('Gagal membuat JPG', 'error'); }
                     }, 500);
                 } else {
-                    setTimeout(() => window.print(), 300); // Tunggu render selesai
+                    setTimeout(() => window.print(), 300);
                 }
             };
 
@@ -475,6 +421,27 @@
                 text += `Terima kasih atas kunjungannya!😊`;
                 const waLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
                 window.open(waLink, '_blank');
+            };
+
+            // Fungsi download PNG baru (ditambahkan)
+            const handleDownloadPNG = (trx) => {
+                setReceiptData(trx);
+                showToast('Menyiapkan file PNG...', 'info');
+                setTimeout(async () => {
+                    try {
+                        const canvas = await window.html2canvas(receiptRef.current, {
+                            scale: 2,
+                            backgroundColor: '#ffffff',
+                        });
+                        const link = document.createElement('a');
+                        link.download = `Struk-${trx.id}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        showToast('Struk PNG berhasil diunduh', 'success');
+                    } catch (err) {
+                        showToast('Gagal membuat PNG', 'error');
+                    }
+                }, 500);
             };
 
             const exportExcel = (period) => {
@@ -546,18 +513,12 @@
                     payment: paymentDetails,
                     cashier: 'Admin',
                 };
-                
-                // Simpan transaksi
                 setTransactions(prev => [newTransaction, ...prev]);
-                
-                // Kosongkan keranjang & tutup panel
                 setCart([]);
                 setOrderInfo({ customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' });
                 setDiscount({ type: 'nominal', value: 0 });
                 setIsCheckoutOpen(false);
                 setIsCartOpen(false);
-                
-                // Tampilkan Pop-Up Sukses Transaksi (Tidak otomatis cetak)
                 setDialog({
                     type: 'success_checkout',
                     transaction: newTransaction,
@@ -578,19 +539,17 @@
             };
 
             const promptTutupShift = () => {
-                // Kalkulasi total uang selama shift
                 const shiftTransactions = transactions.filter(t => new Date(t.timestamp) >= new Date(shift.startTime));
                 const cashSales = shiftTransactions.filter(t => t.payment.method === 'cash').reduce((sum, t) => sum + t.calculations.grandTotal, 0);
                 const qrisSales = shiftTransactions.filter(t => t.payment.method === 'qris').reduce((sum, t) => sum + t.calculations.grandTotal, 0);
                 const expectedCash = shift.startCash + cashSales;
-
                 setDialog({
                     type: 'close_shift', title: 'Rekap Tutup Shift',
                     shiftTransactions, cashSales, qrisSales, expectedCash,
                     onConfirm: () => { 
                         setShift({ isOpen: false, startTime: null, startCash: 0 }); 
                         setDialog(null); showToast('Shift Kasir Berhasil Ditutup', 'success'); 
-                        setActiveTab('dashboard'); // Kembali ke depan
+                        setActiveTab('dashboard');
                     },
                 });
             };
@@ -601,12 +560,9 @@
                 }).catch(() => showToast('Gagal menyalin', 'error'));
             };
 
-            
-            // Komponen Gate: Memaksa Buka Shift
+            // Gate shift
             const renderGate = () => {
-                // Jika shift sudah buka ATAU kita sedang di tab pengaturan (untuk restore data), jangan kunci.
                 if (shift.isOpen || activeTab === 'settings') return null;
-                
                 return (
                     <div className="absolute inset-0 z-40 bg-gray-50 flex flex-col items-center justify-center p-6 animate-fade-in print:hidden">
                         <div className="w-24 h-24 bg-theme/10 rounded-full flex items-center justify-center mb-6">
@@ -658,7 +614,6 @@
                     <div className="absolute inset-0 flex flex-col animate-smooth-fade">
                         <div className="flex-1 overflow-y-auto p-4 space-y-6">
                             
-                            {/* Card Omset */}
                             <div className="bg-theme text-white p-6 rounded-3xl shadow-xl relative overflow-hidden transform transition-all duration-300">
                                 <div className="absolute top-0 right-0 p-4 opacity-10"><Store className="w-32 h-32" /></div>
                                 <h2 className="text-sm font-medium opacity-80 mb-1">Pendapatan Hari Ini</h2>
@@ -669,7 +624,6 @@
                                 </div>
                             </div>
 
-                            {/* Card Terlaris */}
                             { bestSellers.length > 0 && (
                                 <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 animate-slide-up" style={{ animationDelay: '0.05s' }}>
                                     <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm"><Utensils className="w-4 h-4 text-orange-500" /> Menu Terlaris</h3>
@@ -684,7 +638,6 @@
                                 </div>
                             )}
 
-                            {/* Chart Penjualan */}
                             <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 animate-slide-up" style={{ animationDelay: '0.1s' }}>
                                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><BarChart3 className="w-5 h-5 text-theme" /> Analisis 7 Hari</h3>
                                 <div className="flex items-end gap-2 h-32 mt-4 pb-2 border-b border-gray-100">
@@ -711,7 +664,6 @@
                                 </div>
                             </div>
 
-                            {/* Card Status */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${shift.isOpen ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
@@ -738,7 +690,7 @@
                                 <div className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-gray-100 border border-gray-200">
                                     <span className="text-[10px] font-bold text-gray-500">
                                         ✨By{' '}
-                                        <span className="text-transparent bg-clip-text animate-shine">
+                                        <span className="animate-shine">
                                             Dhiya'Ulhag Zulfa Zain
                                         </span>
                                     </span>
@@ -758,7 +710,6 @@
 
                 return (
                     <div className="absolute inset-0 flex flex-col animate-smooth-fade">
-                        {/* Pencarian dan Filter */}
                         <div className="p-4 bg-white z-10 shadow-sm shrink-0">
                             <div className="relative mb-3">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -775,7 +726,6 @@
                             </div>
                         </div>
 
-                        {/* List Grid Item */}
                         <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
                             { [...new Set(filteredMenu.map(i => i.category))].map(category => {
                                 const categoryItems = filteredMenu.filter(i => i.category === category);
@@ -786,7 +736,7 @@
                                             <div className="w-1 h-4 bg-theme rounded-full"></div> { category }
                                         </h2>
                                         <div className="grid grid-cols-2 gap-3">
-                                            { categoryItems.map((item, idx) => (
+                                            { categoryItems.map((item) => (
                                                 <div key={item.id}
                                                     onClick={() => {
                                                         if (item.addons && item.addons.length > 0) {
@@ -795,7 +745,6 @@
                                                     }}
                                                     className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 active:scale-95 transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] relative overflow-hidden group hover:border-theme/30 hover:shadow-md">
                                                     
-                                                    {/* Hiasan background lingkaran */}
                                                     <div className="absolute -right-4 -top-4 w-16 h-16 bg-gray-50 rounded-full opacity-50 group-hover:bg-theme/5 transition-colors"></div>
                                                     
                                                     <div className="relative z-10">
@@ -818,7 +767,6 @@
                                 );
                             })}
                             
-                            {/* Kosong */}
                             { filteredMenu.length === 0 && (
                                 <div className="text-center py-10 text-gray-400">
                                     <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -827,7 +775,6 @@
                             )}
                         </div>
 
-                        {/* Floating Button Keranjang */}
                         { cartCalculations.totalItems > 0 && (
                             <div className="absolute bottom-4 left-0 right-0 px-4 z-20">
                                 <button onClick={() => setIsCartOpen(true)}
@@ -898,9 +845,11 @@
                                                     <span>{ formatDate(trx.timestamp) }</span>
                                                     <span className="uppercase font-bold bg-gray-100 px-2 py-0.5 rounded-md text-[10px] tracking-widest">{ trx.payment.method }</span>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-2">
+                                                {/* Grid 3 kolom: Struk, WA, PNG */}
+                                                <div className="grid grid-cols-3 gap-2">
                                                     <Button variant="ghost" className="w-full text-xs py-2 bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={() => handlePrintOrJPG(trx)}><Printer className="w-3.5 h-3.5" /> Struk</Button>
-                                                    <Button variant="success" className="w-full text-xs py-2" onClick={() => handleShareWA(trx)}><Share2 className="w-3.5 h-3.5" /> WhatsApp</Button>
+                                                    <Button variant="success" className="w-full text-xs py-2" onClick={() => handleShareWA(trx)}><Share2 className="w-3.5 h-3.5" /> WA</Button>
+                                                    <Button variant="outline" className="w-full text-xs py-2" onClick={() => handleDownloadPNG(trx)}><Download className="w-3.5 h-3.5" /> PNG</Button>
                                                 </div>
                                             </div>
                                         ))}
@@ -920,7 +869,6 @@
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-24">
                             
-                            {/* Card Tampilan & Tema */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up">
                                 <div className="p-4 border-b border-gray-50 flex items-center gap-3"><div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center"><Palette className="w-4 h-4 text-purple-600" /></div><h3 className="font-bold text-gray-800 text-sm">Tema Aplikasi</h3></div>
                                 <div className="p-4">
@@ -937,7 +885,6 @@
                                 </div>
                             </div>
 
-                            {/* Card Profil */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.05s' }}>
                                 <div className="p-4 border-b border-gray-50 flex items-center gap-3"><div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center"><Store className="w-4 h-4 text-blue-600" /></div><h3 className="font-bold text-gray-800 text-sm">Profil Usaha</h3></div>
                                 <div className="p-4 space-y-3">
@@ -950,7 +897,6 @@
                                 </div>
                             </div>
 
-                            {/* Card Biaya Tambahan */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.1s' }}>
                                 <div className="p-4 border-b border-gray-50 flex items-center gap-3"><div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center"><Calculator className="w-4 h-4 text-orange-600" /></div><h3 className="font-bold text-gray-800 text-sm">Pajak & Biaya</h3></div>
                                 <div className="p-4 grid grid-cols-2 gap-4">
@@ -959,7 +905,6 @@
                                 </div>
                             </div>
 
-                            {/* Card QRIS */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.15s' }}>
                                 <div className="p-4 border-b border-gray-50 flex items-center gap-3"><div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center"><QrCode className="w-4 h-4 text-indigo-600" /></div><h3 className="font-bold text-gray-800 text-sm">QRIS Merchant ID</h3></div>
                                 <div className="p-4">
@@ -970,7 +915,6 @@
                                 </div>
                             </div>
 
-                            {/* Card Backup/Restore */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.2s' }}>
                                 <div className="p-4 border-b border-gray-50 flex items-center gap-3"><div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center"><Database className="w-4 h-4 text-emerald-600" /></div><h3 className="font-bold text-gray-800 text-sm">Manajemen Data</h3></div>
                                 <div className="p-4 space-y-3">
@@ -1170,9 +1114,8 @@
                                 </div>
                             )}
 
-                           { checkoutMethod === 'qris' && (
+                            { checkoutMethod === 'qris' && (
                                 <div className="p-8 text-center bg-white flex-1 flex flex-col items-center justify-center animate-fade-in">
-                                    {/* Gambar QRIS */}
                                     <div className="w-64 h-64 bg-white rounded-3xl flex items-center justify-center mb-6 overflow-hidden shadow-sm">
                                         <img 
                                             src="./qrisabun.png" 
@@ -1184,8 +1127,6 @@
                                             }}
                                         />
                                     </div>
-
-        {/* Wrap semua teks dalam satu div */}
                                     <div>
                                         <p className="text-gray-800 font-black text-lg mb-1">Menunggu Scan QRIS</p>
                                         <p className="text-gray-500 text-sm mb-4">
@@ -1244,7 +1185,6 @@
             const renderDialog = () => {
                 if (!dialog) return null;
                 
-                // Pop-up Sukses Transaksi Khusus (Manual Action)
                 if (dialog.type === 'success_checkout') {
                     return (
                         <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in will-change-transform">
@@ -1258,6 +1198,10 @@
                                 <div className="w-full space-y-3">
                                     <Button variant="outline" className="w-full border-gray-200 text-gray-700 bg-gray-50 hover:bg-gray-100" onClick={() => handlePrintOrJPG(dialog.transaction)}>
                                         <Printer className="w-4 h-4" /> Cetak / Unduh Struk
+                                    </Button>
+                                    {/* Tombol PNG baru di dialog sukses */}
+                                    <Button variant="outline" className="w-full border-gray-200 text-gray-700 bg-gray-50 hover:bg-gray-100" onClick={() => handleDownloadPNG(dialog.transaction)}>
+                                        <Download className="w-4 h-4" /> Simpan sebagai PNG
                                     </Button>
                                     <Button variant="success" className="w-full" onClick={() => handleShareWA(dialog.transaction)}>
                                         <Share2 className="w-4 h-4" /> Bagikan via WhatsApp
@@ -1326,7 +1270,6 @@
 
                 return (
                     <div className="absolute inset-0 z-50 flex flex-col justify-end sm:items-center sm:justify-center px-0 sm:px-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-                        {/* Area penutup modal */}
                         <div className="absolute inset-0" onClick={() => setSelectedItemForAddon(null)}></div>
                         
                         <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl flex flex-col max-h-[85dvh] animate-slide-up sm:animate-popup shadow-2xl overflow-hidden relative z-10">
@@ -1431,7 +1374,6 @@
                             </div>
                         </div>
 
-                        {/* Layar Cetak (Thermal Printer Browser Support) */}
                         <div className="hidden print:block w-full max-w-[58mm] mx-auto text-black bg-white font-mono text-[11px] leading-tight p-0 m-0">
                             <div className="text-center mb-3">
                                 <h1 className="text-base font-extrabold mb-1">{ storeConfig.appName }</h1>
@@ -1487,7 +1429,6 @@
                     { renderGate() }
 
                     <header className="bg-theme text-white p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative transition-colors duration-500">
-                        {/* Hiasan Pola */}
                         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
                         
                         <div className="flex items-center gap-3 relative z-10">
@@ -1495,12 +1436,10 @@
                             <div className="flex flex-col">
                                 <h1 className="text-lg font-black tracking-wide leading-tight drop-shadow-sm">{ storeConfig.appName }</h1>
                                 <div className="flex items-center gap-1.5 mt-0.5">
-                                    {/* Jam Realtime */}
                                     <span className="text-[10px] font-medium bg-black/20 px-2 py-0.5 rounded-md shadow-sm border border-white/10 flex items-center gap-1">
                                         <Clock className="w-3 h-3 opacity-80" />
                                         { currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }
                                     </span>
-                                    {/* Status Shift */}
                                     <span className="text-[10px] font-bold bg-black/20 px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1.5 border border-white/10">
                                         <span className={`w-2 h-2 rounded-full ${shift.isOpen ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
                                         { shift.isOpen ? 'Buka' : 'Tutup' }
@@ -1509,7 +1448,6 @@
                             </div>
                         </div>
 
-                        {/* Titik Tiga Settings Header */}
                         <div className="relative z-20 overflow-visible">
                             <button onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition-colors relative z-10 border border-white/10">
                                 <MoreVertical className="w-5 h-5" />
@@ -1543,7 +1481,6 @@
                     { renderCheckout() }
                     { renderDialog() }
 
-                    {/* Area Toasts diperbaiki, stack ke bawah dari atas */}
                     <div className="absolute top-20 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none print:hidden px-4">
                         { toasts.map(toast => <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />) }
                     </div>
@@ -1559,7 +1496,6 @@
 
     <style>
         :root {
-            /* Fallback warna, dikendalikan penuh oleh React di atas */
             --theme-color: #9A1C1F;
             --theme-hover: #7a1518;
         }
@@ -1568,7 +1504,6 @@
         body, #root { overflow-x: hidden; }
         img, svg, video { max-width: 100%; height: auto; }
 
-        /* Animasi Transisi Halus (Bebas Getar) */
         @keyframes smoothFade { 
             0% { opacity: 0; transform: translateY(5px); } 
             100% { opacity: 1; transform: translateY(0); } 
@@ -1618,7 +1553,6 @@
             animation: shine 3s linear infinite;
         }
 
-        /* Menghilangkan scrollbar tapi tetap bisa di scroll */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 
@@ -1626,77 +1560,20 @@
             body { background: white !important; display: block !important; margin: 0; padding: 0; min-height: auto; } 
             html { width: 58mm; } 
         }
-        /* Letakkan di dalam <style> yang sudah ada */
-body, div, p, span, h1, h2, h3, h4, h5, h6, a, li, td, th, b, strong, i, em, button, label {
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
 
-/* Izinkan seleksi hanya pada input & textarea (agar tetap bisa ngetik) */
-input, textarea, [contenteditable="true"] {
-    -webkit-user-select: text;
-    -moz-user-select: text;
-    -ms-user-select: text;
-    user-select: text;
-}
-        // Letakkan di <script> setelah DOM siap (bisa dalam window.onload)
-(function() {
-    'use strict';
-
-    // Mencegah klik kanan
-    document.addEventListener('contextmenu', e => e.preventDefault());
-
-    // Mencegah seleksi dengan mouse (drag select)
-    document.addEventListener('selectstart', e => {
-        if (!isInputFocused()) e.preventDefault();
-    });
-
-    // Cek apakah fokus di input/textarea
-    function isInputFocused() {
-        const tag = document.activeElement.tagName;
-        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable;
-    }
-
-    // Blokir copy, cut, paste (kecuali di input)
-    ['copy', 'cut', 'paste'].forEach(event => {
-        document.addEventListener(event, e => {
-            if (!isInputFocused()) e.preventDefault();
-        });
-    });
-
-    // Blokir drag (gambar & teks)
-    document.addEventListener('dragstart', e => e.preventDefault());
-
-    // Blokir shortcut keyboard: Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+U, Ctrl+S, Ctrl+P, F12, Ctrl+Shift+I/J/C
-    document.addEventListener('keydown', e => {
-        if (isInputFocused()) return; // biarkan input tetap berfungsi
-
-        const key = e.keyCode;
-        const ctrl = e.ctrlKey || e.metaKey;
-        const shift = e.shiftKey;
-
-        // F12
-        if (key === 123) {
-            e.preventDefault();
-            return false;
+        body, div, p, span, h1, h2, h3, h4, h5, h6, a, li, td, th, b, strong, i, em, button, label {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
 
-        if (ctrl) {
-            // Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+U, Ctrl+S, Ctrl+P
-            if (key === 67 || key === 88 || key === 86 || key === 85 || key === 83 || key === 80) {
-                e.preventDefault();
-                return false;
-            }
-            // Ctrl+Shift+I (DevTools), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspect)
-            if (shift && (key === 73 || key === 74 || key === 67)) {
-                e.preventDefault();
-                return false;
-            }
+        input, textarea, [contenteditable="true"] {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
         }
-    });
-})();
     </style>
 </body>
 </html>
