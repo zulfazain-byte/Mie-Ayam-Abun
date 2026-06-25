@@ -138,7 +138,7 @@
     <div id="root" class="w-full h-[100dvh] max-w-md bg-white shadow-2xl relative overflow-hidden flex flex-col mx-auto transition-colors duration-500"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useRef } from 'react';
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
         import { createRoot } from 'react-dom/client';
         import {
             ShoppingBag, Printer, MessageCircle, Plus, Minus,
@@ -150,25 +150,33 @@
             Share2, FileSpreadsheet, TrendingUp, Database, UploadCloud, Copy, Palette
         } from 'lucide-react';
 
-        const MENU_DATABASE = [
-            { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: Utensils, addons: [] },
-            { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: Utensils, addons: [] },
-            { id: 'm3', category: 'Makanan', name: 'Tempe Kemul/4 Pcs', price: 5000, icon: Utensils, addons: [] },
-            { id: 'b1', category: 'Minuman', name: 'Teh Standar', price: 4000, icon: Coffee, addons: [{ id: 'ice', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b2', category: 'Minuman', name: 'Teh Jumbo', price: 6000, icon: Coffee, addons: [{ id: 'ice-j', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-j', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b3', category: 'Minuman', name: 'Jeruk', price: 6000, icon: Coffee, addons: [{ id: 'ice-jr', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-jr', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b4', category: 'Minuman', name: 'Bunga Rosella', price: 6000, icon: Coffee, addons: [{ id: 'ice-r', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-r', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b5', category: 'Minuman', name: 'Bunga Telang', price: 6000, icon: Coffee, addons: [{ id: 'ice-t', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-t', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b6', category: 'Minuman', name: 'Bunga Telang + Nipis', price: 7000, icon: Coffee, addons: [{ id: 'ice-tn', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-tn', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b7', category: 'Minuman', name: 'Americano', price: 6000, icon: Coffee, addons: [{ id: 'ice-a', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-a', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b8', category: 'Minuman', name: 'Lemon Tea', price: 5000, icon: Coffee, addons: [{ id: 'ice-lt', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-lt', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b9', category: 'Minuman', name: 'Kopi Hitam', price: 5000, icon: Coffee, addons: [{ id: 'ice-kh', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-kh', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b10', category: 'Minuman', name: 'Coffemix', price: 5000, icon: Coffee, addons: [{ id: 'ice-c', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-c', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b11', category: 'Minuman', name: 'Teh Tarik', price: 6000, icon: Coffee, addons: [{ id: 'ice-tt', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-tt', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b12', category: 'Minuman', name: 'Good Day Freeze', price: 6000, icon: Coffee, addons: [{ id: 'ice-gd', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-gd', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b13', category: 'Minuman', name: 'Milo', price: 6000, icon: Coffee, addons: [{ id: 'ice-m', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-m', name: 'Hot / Panas', price: 0, group: 'temp' }] },
-            { id: 'b14', category: 'Minuman', name: 'Milo + Kental', price: 7000, icon: Coffee, addons: [{ id: 'ice-mk', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-mk', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+        // ───────────────────── DEFAULT MENU (tetap, tidak bisa dihapus) ─────────────────────
+        const DEFAULT_MENU = [
+            { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: 'Utensils', addons: [] },
+            { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: 'Utensils', addons: [] },
+            { id: 'm3', category: 'Makanan', name: 'Tempe Kemul/4 Pcs', price: 5000, icon: 'Utensils', addons: [] },
+            { id: 'b1', category: 'Minuman', name: 'Teh Standar', price: 4000, icon: 'Coffee', addons: [{ id: 'ice', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b2', category: 'Minuman', name: 'Teh Jumbo', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-j', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-j', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b3', category: 'Minuman', name: 'Jeruk', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-jr', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-jr', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b4', category: 'Minuman', name: 'Bunga Rosella', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-r', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-r', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b5', category: 'Minuman', name: 'Bunga Telang', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-t', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-t', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b6', category: 'Minuman', name: 'Bunga Telang + Nipis', price: 7000, icon: 'Coffee', addons: [{ id: 'ice-tn', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-tn', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b7', category: 'Minuman', name: 'Americano', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-a', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-a', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b8', category: 'Minuman', name: 'Lemon Tea', price: 5000, icon: 'Coffee', addons: [{ id: 'ice-lt', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-lt', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b9', category: 'Minuman', name: 'Kopi Hitam', price: 5000, icon: 'Coffee', addons: [{ id: 'ice-kh', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-kh', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b10', category: 'Minuman', name: 'Coffemix', price: 5000, icon: 'Coffee', addons: [{ id: 'ice-c', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-c', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b11', category: 'Minuman', name: 'Teh Tarik', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-tt', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-tt', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b12', category: 'Minuman', name: 'Good Day Freeze', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-gd', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-gd', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b13', category: 'Minuman', name: 'Milo', price: 6000, icon: 'Coffee', addons: [{ id: 'ice-m', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-m', name: 'Hot / Panas', price: 0, group: 'temp' }] },
+            { id: 'b14', category: 'Minuman', name: 'Milo + Kental', price: 7000, icon: 'Coffee', addons: [{ id: 'ice-mk', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-mk', name: 'Hot / Panas', price: 0, group: 'temp' }] },
         ];
+
+        // Map icon string ke komponen (untuk render di menu)
+        const iconMap = {
+            Utensils: Utensils,
+            Coffee: Coffee,
+            // bisa ditambah nanti
+        };
 
         const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online (Ojol)'];
         const PAYMENT_METHODS = [
@@ -277,12 +285,27 @@
                 return saved ? JSON.parse(saved) : { customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' };
             });
 
+            // ─── Custom Menu State ──────────────────────────────────────────
+            const [customMenuItems, setCustomMenuItems] = useState(() => {
+                const saved = localStorage.getItem('pos_custom_menu');
+                return saved ? JSON.parse(saved) : [];
+            });
+
             useEffect(() => { localStorage.setItem('pos_config', JSON.stringify(storeConfig)); }, [storeConfig]);
             useEffect(() => { localStorage.setItem('pos_transactions', JSON.stringify(transactions)); }, [transactions]);
             useEffect(() => { localStorage.setItem('pos_hold', JSON.stringify(holdOrders)); }, [holdOrders]);
             useEffect(() => { localStorage.setItem('pos_shift', JSON.stringify(shift)); }, [shift]);
             useEffect(() => { localStorage.setItem('pos_cart', JSON.stringify(cart)); }, [cart]);
             useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
+            useEffect(() => { localStorage.setItem('pos_custom_menu', JSON.stringify(customMenuItems)); }, [customMenuItems]);
+
+            // Gabungkan menu default dengan custom (custom di belakang, bisa override ID meski sebaiknya unik)
+            const MENU_DATABASE = useMemo(() => {
+                return [...DEFAULT_MENU, ...customMenuItems.map(item => ({
+                    ...item,
+                    // pastikan icon string diubah jadi fungsi nanti saat render
+                }))];
+            }, [customMenuItems]);
 
             useEffect(() => {
                 const theme = THEMES.find(t => t.id === storeConfig.themeId) || THEMES[0];
@@ -423,7 +446,6 @@
                 window.open(waLink, '_blank');
             };
 
-            // Fungsi download PNG baru (ditambahkan)
             const handleDownloadPNG = (trx) => {
                 setReceiptData(trx);
                 showToast('Menyiapkan file PNG...', 'info');
@@ -469,7 +491,7 @@
             };
 
             const handleBackup = () => {
-                const data = { storeConfig, transactions, holdOrders };
+                const data = { storeConfig, transactions, holdOrders, customMenuItems };
                 const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
@@ -488,6 +510,7 @@
                         if (data.storeConfig) setStoreConfig(data.storeConfig);
                         if (data.transactions) setTransactions(data.transactions);
                         if (data.holdOrders) setHoldOrders(data.holdOrders);
+                        if (data.customMenuItems) setCustomMenuItems(data.customMenuItems);
                         showToast('Data berhasil direstore!', 'success');
                     } catch (err) { showToast('Format file tidak valid!', 'error'); }
                 };
@@ -558,6 +581,42 @@
                 navigator.clipboard.writeText(storeConfig.qrisMerchantId || 'ID026533909051').then(() => {
                     showToast('QRIS Merchant ID disalin!', 'success');
                 }).catch(() => showToast('Gagal menyalin', 'error'));
+            };
+
+            // ───── Custom Menu handlers ────────────────────────────────────
+            const addCustomMenuItem = (newItem) => {
+                // validasi sederhana
+                if (!newItem.name.trim() || !newItem.price || newItem.price <= 0) {
+                    showToast('Nama dan harga harus diisi!', 'error');
+                    return;
+                }
+                const id = 'custom_' + generateId();
+                const item = {
+                    id,
+                    category: newItem.category || 'Makanan',
+                    name: newItem.name.trim(),
+                    price: Number(newItem.price),
+                    icon: newItem.category === 'Minuman' ? 'Coffee' : 'Utensils',
+                    addons: newItem.hasVariant ? [
+                        { id: id + '_ice', name: 'Ice / Dingin', price: 0, group: 'temp' },
+                        { id: id + '_hot', name: 'Hot / Panas', price: 0, group: 'temp' }
+                    ] : []
+                };
+                setCustomMenuItems(prev => [...prev, item]);
+                showToast(`"${item.name}" berhasil ditambahkan`, 'success');
+                setDialog(null);
+            };
+
+            const deleteCustomMenuItem = (id) => {
+                setCustomMenuItems(prev => prev.filter(item => item.id !== id));
+                showToast('Menu dihapus', 'info');
+            };
+
+            const openAddMenuDialog = () => {
+                setDialog({
+                    type: 'add_menu',
+                    title: 'Tambah Menu Baru',
+                });
             };
 
             // Gate shift
@@ -736,32 +795,35 @@
                                             <div className="w-1 h-4 bg-theme rounded-full"></div> { category }
                                         </h2>
                                         <div className="grid grid-cols-2 gap-3">
-                                            { categoryItems.map((item) => (
-                                                <div key={item.id}
-                                                    onClick={() => {
-                                                        if (item.addons && item.addons.length > 0) {
-                                                            setSelectedItemForAddon(item); setSelectedAddons([]); setAddonNotes('');
-                                                        } else { handleAddToCart(item); }
-                                                    }}
-                                                    className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 active:scale-95 transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] relative overflow-hidden group hover:border-theme/30 hover:shadow-md">
-                                                    
-                                                    <div className="absolute -right-4 -top-4 w-16 h-16 bg-gray-50 rounded-full opacity-50 group-hover:bg-theme/5 transition-colors"></div>
-                                                    
-                                                    <div className="relative z-10">
-                                                        <item.icon className="w-5 h-5 text-gray-400 mb-2 group-hover:text-theme transition-colors" />
-                                                        <h3 className="font-bold text-[13px] text-gray-800 leading-tight mb-1">{ item.name }</h3>
-                                                        { item.addons && item.addons.length > 0 && (
-                                                            <span className="text-[9px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-md font-bold border border-orange-100">+ Varian</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex justify-between items-end relative z-10 mt-2">
-                                                        <p className="text-theme font-black text-[13px]">{ formatRp(item.price) }</p>
-                                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-theme group-hover:text-white transition-colors text-gray-600">
-                                                            <Plus className="w-3.5 h-3.5" />
+                                            { categoryItems.map((item) => {
+                                                const IconComp = iconMap[item.icon] || Utensils;
+                                                return (
+                                                    <div key={item.id}
+                                                        onClick={() => {
+                                                            if (item.addons && item.addons.length > 0) {
+                                                                setSelectedItemForAddon(item); setSelectedAddons([]); setAddonNotes('');
+                                                            } else { handleAddToCart(item); }
+                                                        }}
+                                                        className="bg-white rounded-2xl p-3 shadow-sm border border-gray-100 active:scale-95 transition-all duration-200 cursor-pointer flex flex-col justify-between min-h-[120px] relative overflow-hidden group hover:border-theme/30 hover:shadow-md">
+                                                        
+                                                        <div className="absolute -right-4 -top-4 w-16 h-16 bg-gray-50 rounded-full opacity-50 group-hover:bg-theme/5 transition-colors"></div>
+                                                        
+                                                        <div className="relative z-10">
+                                                            <IconComp className="w-5 h-5 text-gray-400 mb-2 group-hover:text-theme transition-colors" />
+                                                            <h3 className="font-bold text-[13px] text-gray-800 leading-tight mb-1">{ item.name }</h3>
+                                                            { item.addons && item.addons.length > 0 && (
+                                                                <span className="text-[9px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-md font-bold border border-orange-100">+ Varian</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex justify-between items-end relative z-10 mt-2">
+                                                            <p className="text-theme font-black text-[13px]">{ formatRp(item.price) }</p>
+                                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-theme group-hover:text-white transition-colors text-gray-600">
+                                                                <Plus className="w-3.5 h-3.5" />
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </section>
                                 );
@@ -894,6 +956,41 @@
                                         <div><label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Instagram</label><input type="text" value={storeConfig.instagram} onChange={e => setStoreConfig({...storeConfig, instagram: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-theme focus:outline-none transition-colors" /></div>
                                         <div><label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Telepon</label><input type="tel" value={storeConfig.phone} onChange={e => setStoreConfig({...storeConfig, phone: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:border-theme focus:outline-none transition-colors" /></div>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* ───── KELOLA MENU ──────────────────────────── */}
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.08s' }}>
+                                <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                            <Edit className="w-4 h-4 text-yellow-600" />
+                                        </div>
+                                        <h3 className="font-bold text-gray-800 text-sm">Kelola Menu</h3>
+                                    </div>
+                                    <Button onClick={openAddMenuDialog} className="text-xs py-1.5 px-3">
+                                        <Plus className="w-3.5 h-3.5" /> Tambah
+                                    </Button>
+                                </div>
+                                <div className="p-4">
+                                    {customMenuItems.length === 0 ? (
+                                        <p className="text-xs text-gray-500 py-3 text-center">Belum ada menu tambahan. Tekan <b>Tambah</b> untuk menambahkan menu baru.</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {customMenuItems.map(item => (
+                                                <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                                    <div>
+                                                        <p className="font-bold text-sm text-gray-800">{item.name}</p>
+                                                        <p className="text-xs text-gray-500">{formatRp(item.price)} • {item.category} {item.addons.length > 0 && '(varian suhu)'}</p>
+                                                    </div>
+                                                    <button onClick={() => deleteCustomMenuItem(item.id)}
+                                                        className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -1185,6 +1282,57 @@
             const renderDialog = () => {
                 if (!dialog) return null;
                 
+                // Dialog Tambah Menu
+                if (dialog.type === 'add_menu') {
+                    const [menuName, setMenuName] = useState('');
+                    const [menuPrice, setMenuPrice] = useState('');
+                    const [menuCategory, setMenuCategory] = useState('Makanan');
+                    const [hasVariant, setHasVariant] = useState(false);
+
+                    return (
+                        <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in will-change-transform">
+                            <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
+                                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                    <Plus className="w-5 h-5 text-theme" /> Tambah Menu Baru
+                                </h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Nama Menu</label>
+                                        <input type="text" value={menuName} onChange={e => setMenuName(e.target.value)}
+                                            placeholder="Contoh: Nasi Goreng" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors" autoFocus />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Harga (Rp)</label>
+                                        <input type="number" value={menuPrice} onChange={e => setMenuPrice(e.target.value)}
+                                            placeholder="12000" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Kategori</label>
+                                        <select value={menuCategory} onChange={e => setMenuCategory(e.target.value)}
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors">
+                                            <option value="Makanan">Makanan</option>
+                                            <option value="Minuman">Minuman</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex items-center gap-3 py-2">
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={hasVariant} onChange={(e) => setHasVariant(e.target.checked)} className="sr-only peer" />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-theme/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-theme"></div>
+                                        </label>
+                                        <span className="text-sm font-bold text-gray-700">Varian Suhu (Ice/Hot)</span>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <Button variant="ghost" className="flex-1 bg-gray-100" onClick={() => setDialog(null)}>Batal</Button>
+                                    <Button variant="primary" className="flex-1" onClick={() => addCustomMenuItem({ name: menuName, price: menuPrice, category: menuCategory, hasVariant })}>
+                                        Simpan
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                }
+
                 if (dialog.type === 'success_checkout') {
                     return (
                         <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in will-change-transform">
@@ -1199,7 +1347,6 @@
                                     <Button variant="outline" className="w-full border-gray-200 text-gray-700 bg-gray-50 hover:bg-gray-100" onClick={() => handlePrintOrJPG(dialog.transaction)}>
                                         <Printer className="w-4 h-4" /> Cetak / Unduh Struk
                                     </Button>
-                                    {/* Tombol PNG baru di dialog sukses */}
                                     <Button variant="outline" className="w-full border-gray-200 text-gray-700 bg-gray-50 hover:bg-gray-100" onClick={() => handleDownloadPNG(dialog.transaction)}>
                                         <Download className="w-4 h-4" /> Simpan sebagai PNG
                                     </Button>
