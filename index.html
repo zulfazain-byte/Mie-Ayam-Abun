@@ -10,10 +10,8 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>POS Mi Ayam Abun</title>
 
-    <!-- Wajib: link ke file manifest.json -->
     <link rel="manifest" href="manifest.json">
 
-    <!-- Script: Service Worker + Install Prompt (BERSIH & TIDAK DUPLIKAT) -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -66,7 +64,6 @@
         });
     </script>
 
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -81,7 +78,6 @@
         }
     </script>
 
-    <!-- Proteksi copy-paste (kecuali input) -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             document.addEventListener('contextmenu', e => e.preventDefault());
@@ -116,7 +112,6 @@
         });
     </script>
 
-    <!-- Library Eksternal -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 
@@ -147,10 +142,11 @@
             ArrowLeft, MoreVertical, Edit, Search, CheckCircle,
             AlertCircle, Clock, Utensils, Coffee, Calculator, Check,
             Receipt, BarChart3, LogOut, Save, FileText, Info, Download,
-            Share2, FileSpreadsheet, TrendingUp, Database, UploadCloud, Copy, Palette
+            Share2, FileSpreadsheet, TrendingUp, Database, UploadCloud, Copy, Palette,
+            User, Lock, Shield, Crown, UserCircle
         } from 'lucide-react';
 
-        // ───────────────────── DEFAULT MENU (tetap, tidak bisa dihapus) ─────────────────────
+        // ───────────────────── DEFAULT MENU ─────────────────────
         const DEFAULT_MENU = [
             { id: 'm1', category: 'Makanan', name: 'Mie Ayam Original', price: 12000, icon: 'Utensils', addons: [] },
             { id: 'm2', category: 'Makanan', name: 'Tempe Kemul/Pcs', price: 1500, icon: 'Utensils', addons: [] },
@@ -171,12 +167,7 @@
             { id: 'b14', category: 'Minuman', name: 'Milo + Kental', price: 7000, icon: 'Coffee', addons: [{ id: 'ice-mk', name: 'Ice / Dingin', price: 0, group: 'temp' }, { id: 'hot-mk', name: 'Hot / Panas', price: 0, group: 'temp' }] },
         ];
 
-        // Map icon string ke komponen (untuk render di menu)
-        const iconMap = {
-            Utensils: Utensils,
-            Coffee: Coffee,
-            // bisa ditambah nanti
-        };
+        const iconMap = { Utensils: Utensils, Coffee: Coffee };
 
         const ORDER_TYPES = ['Dine In', 'Takeaway', 'Delivery', 'Online (Ojol)'];
         const PAYMENT_METHODS = [
@@ -191,6 +182,12 @@
             { id: 'ungu', name: 'Ungu Elegan', color: '#8B5CF6', hover: '#7C3AED' },
             { id: 'hitam', name: 'Dark Mode', color: '#1F2937', hover: '#111827' },
         ];
+
+        // ───────────────────── DEFAULT USERS ─────────────────────
+        const DEFAULT_USERS = {
+            owner: { username: 'owner', pin: '123456', name: 'Owner', role: 'owner' },
+            karyawan: { username: 'karyawan', pin: '000000', name: 'Karyawan', role: 'karyawan' }
+        };
 
         const DEFAULT_STORE_CONFIG = {
             appName: 'Mi Ayam Abun',
@@ -260,6 +257,17 @@
             const [splashState, setSplashState] = useState('visible');
             const [currentTime, setCurrentTime] = useState(new Date());
 
+            // ─── AUTH STATE ──────────────────────────────────────────────
+            const [auth, setAuth] = useState(() => {
+                const saved = localStorage.getItem('pos_auth');
+                return saved ? JSON.parse(saved) : { isLoggedIn: false, role: null, username: null, name: null };
+            });
+            const [loginForm, setLoginForm] = useState({ username: '', pin: '' });
+            const [loginError, setLoginError] = useState('');
+
+            // ─── STATE FORM TAMBAH MENU (dipindah keluar dari conditional) ──
+            const [newMenuForm, setNewMenuForm] = useState({ name: '', price: '', category: 'Makanan', hasVariant: false });
+
             const [storeConfig, setStoreConfig] = useState(() => {
                 const saved = localStorage.getItem('pos_config');
                 return saved ? { ...DEFAULT_STORE_CONFIG, ...JSON.parse(saved) } : DEFAULT_STORE_CONFIG;
@@ -284,13 +292,12 @@
                 const saved = localStorage.getItem('pos_orderInfo');
                 return saved ? JSON.parse(saved) : { customerName: '', customerPhone: '', orderType: 'Dine In', orderNotes: '' };
             });
-
-            // ─── Custom Menu State ──────────────────────────────────────────
             const [customMenuItems, setCustomMenuItems] = useState(() => {
                 const saved = localStorage.getItem('pos_custom_menu');
                 return saved ? JSON.parse(saved) : [];
             });
 
+            useEffect(() => { localStorage.setItem('pos_auth', JSON.stringify(auth)); }, [auth]);
             useEffect(() => { localStorage.setItem('pos_config', JSON.stringify(storeConfig)); }, [storeConfig]);
             useEffect(() => { localStorage.setItem('pos_transactions', JSON.stringify(transactions)); }, [transactions]);
             useEffect(() => { localStorage.setItem('pos_hold', JSON.stringify(holdOrders)); }, [holdOrders]);
@@ -299,12 +306,8 @@
             useEffect(() => { localStorage.setItem('pos_orderInfo', JSON.stringify(orderInfo)); }, [orderInfo]);
             useEffect(() => { localStorage.setItem('pos_custom_menu', JSON.stringify(customMenuItems)); }, [customMenuItems]);
 
-            // Gabungkan menu default dengan custom (custom di belakang, bisa override ID meski sebaiknya unik)
             const MENU_DATABASE = useMemo(() => {
-                return [...DEFAULT_MENU, ...customMenuItems.map(item => ({
-                    ...item,
-                    // pastikan icon string diubah jadi fungsi nanti saat render
-                }))];
+                return [...DEFAULT_MENU, ...customMenuItems];
             }, [customMenuItems]);
 
             useEffect(() => {
@@ -339,6 +342,38 @@
                 setToasts(prev => [...prev, { id, message, type }]);
             };
             const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+            // ─── AUTH HANDLERS ───────────────────────────────────────────
+            const handleLogin = () => {
+                const users = storeConfig.users ? { ...DEFAULT_USERS, ...storeConfig.users } : DEFAULT_USERS;
+                const user = Object.values(users).find(u =>
+                    u.username.toLowerCase() === loginForm.username.toLowerCase().trim() &&
+                    u.pin === loginForm.pin
+                );
+                if (user) {
+                    setAuth({ isLoggedIn: true, role: user.role, username: user.username, name: user.name });
+                    setLoginForm({ username: '', pin: '' });
+                    setLoginError('');
+                    setActiveTab('pos');
+                    showToast(`Selamat datang, ${user.name}!`, 'success');
+                } else {
+                    setLoginError('Username atau PIN salah!');
+                }
+            };
+
+            const handleLogout = () => {
+                setDialog({
+                    type: 'confirm',
+                    title: 'Logout',
+                    message: 'Anda akan keluar dari aplikasi. Lanjutkan?',
+                    onConfirm: () => {
+                        setAuth({ isLoggedIn: false, role: null, username: null, name: null });
+                        setDialog(null);
+                        setIsHeaderMenuOpen(false);
+                        setActiveTab('pos');
+                    }
+                });
+            };
 
             const handleAddToCart = (item, addons = [], notes = '') => {
                 const cartItemId = `${item.id}-${addons.map(a => a.id).join('-')}-${notes}`;
@@ -451,18 +486,13 @@
                 showToast('Menyiapkan file PNG...', 'info');
                 setTimeout(async () => {
                     try {
-                        const canvas = await window.html2canvas(receiptRef.current, {
-                            scale: 2,
-                            backgroundColor: '#ffffff',
-                        });
+                        const canvas = await window.html2canvas(receiptRef.current, { scale: 2, backgroundColor: '#ffffff' });
                         const link = document.createElement('a');
                         link.download = `Struk-${trx.id}.png`;
                         link.href = canvas.toDataURL('image/png');
                         link.click();
                         showToast('Struk PNG berhasil diunduh', 'success');
-                    } catch (err) {
-                        showToast('Gagal membuat PNG', 'error');
-                    }
+                    } catch (err) { showToast('Gagal membuat PNG', 'error'); }
                 }, 500);
             };
 
@@ -534,7 +564,7 @@
                     orderInfo: { ...orderInfo },
                     calculations: cartCalculations,
                     payment: paymentDetails,
-                    cashier: 'Admin',
+                    cashier: auth.name || 'Admin',
                 };
                 setTransactions(prev => [newTransaction, ...prev]);
                 setCart([]);
@@ -583,10 +613,10 @@
                 }).catch(() => showToast('Gagal menyalin', 'error'));
             };
 
-            // ───── Custom Menu handlers ────────────────────────────────────
-            const addCustomMenuItem = (newItem) => {
-                // validasi sederhana
-                if (!newItem.name.trim() || !newItem.price || newItem.price <= 0) {
+            // ─── CUSTOM MENU HANDLERS ────────────────────────────────────
+            const addCustomMenuItem = () => {
+                const newItem = newMenuForm;
+                if (!newItem.name.trim() || !newItem.price || Number(newItem.price) <= 0) {
                     showToast('Nama dan harga harus diisi!', 'error');
                     return;
                 }
@@ -613,26 +643,77 @@
             };
 
             const openAddMenuDialog = () => {
-                setDialog({
-                    type: 'add_menu',
-                    title: 'Tambah Menu Baru',
-                });
+                setNewMenuForm({ name: '', price: '', category: 'Makanan', hasVariant: false });
+                setDialog({ type: 'add_menu', title: 'Tambah Menu Baru' });
             };
 
-            // Gate shift
-            const renderGate = () => {
-                if (shift.isOpen || activeTab === 'settings') return null;
+            // ─── RENDER: LOGIN ───────────────────────────────────────────
+            const renderLogin = () => {
                 return (
-                    <div className="absolute inset-0 z-40 bg-gray-50 flex flex-col items-center justify-center p-6 animate-fade-in print:hidden">
-                        <div className="w-24 h-24 bg-theme/10 rounded-full flex items-center justify-center mb-6">
-                            <Store className="w-12 h-12 text-theme" />
+                    <div className="absolute inset-0 z-[150] flex items-center justify-center p-6 bg-theme overflow-hidden">
+                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1.5px, transparent 0)', backgroundSize: '20px 20px' }}></div>
+                        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 relative z-10 animate-popup">
+                            <div className="flex flex-col items-center mb-6">
+                                <div className="w-20 h-20 bg-theme/10 rounded-2xl flex items-center justify-center mb-3 border border-theme/20">
+                                    <img src="abun200.png" alt="Logo" className="w-16 h-16 object-contain" onError={(e) => { e.target.style.display='none'; }} />
+                                </div>
+                                <h1 className="text-2xl font-black text-gray-800 text-center">{storeConfig.appName}</h1>
+                                <p className="text-xs text-gray-500 mt-1 font-medium">Silakan login untuk melanjutkan</p>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Username</label>
+                                    <div className="relative">
+                                        <User className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            type="text"
+                                            value={loginForm.username}
+                                            onChange={(e) => setLoginForm({...loginForm, username: e.target.value})}
+                                            placeholder="owner / karyawan"
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-bold text-gray-800 focus:outline-none focus:border-theme transition-colors"
+                                            autoComplete="username"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">PIN</label>
+                                    <div className="relative">
+                                        <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                        <input
+                                            type="password"
+                                            inputMode="numeric"
+                                            value={loginForm.pin}
+                                            onChange={(e) => setLoginForm({...loginForm, pin: e.target.value})}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                                            placeholder="••••••"
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-4 py-3 text-sm font-bold text-gray-800 focus:outline-none focus:border-theme transition-colors"
+                                            autoComplete="current-password"
+                                        />
+                                    </div>
+                                </div>
+
+                                {loginError && (
+                                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+                                        <p className="text-red-600 text-xs font-bold">{loginError}</p>
+                                    </div>
+                                )}
+
+                                <Button className="w-full text-base py-3.5 shadow-theme/30 rounded-2xl" onClick={handleLogin}>
+                                    Masuk
+                                </Button>
+                            </div>
+
+                            <div className="mt-6 p-3 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                                <p className="text-[10px] text-gray-500 text-center font-medium leading-relaxed">
+                                    <b className="text-gray-700">Demo Login:</b><br/>
+                                    👑 Owner: <b>owner</b> / <b>123456</b><br/>
+                                    👤 Karyawan: <b>karyawan</b> / <b>000000</b>
+                                </p>
+                            </div>
                         </div>
-                        <h2 className="text-2xl font-black text-gray-800 mb-2">Kasir Ditutup</h2>
-                        <p className="text-gray-500 text-center text-sm mb-8 max-w-xs">Anda harus membuka shift kasir dan memasukkan modal awal sebelum dapat melakukan transaksi.</p>
-                        <Button className="w-full max-w-xs shadow-xl shadow-theme/30 text-lg py-4 rounded-2xl" onClick={promptBukaShift}>
-                            Buka Shift Sekarang
-                        </Button>
-                        <p className="mt-8 text-xs font-bold text-gray-400 cursor-pointer hover:text-theme transition-colors" onClick={() => setActiveTab('settings')}>Masuk ke Pengaturan Aplikasi</p>
                     </div>
                 );
             };
@@ -651,6 +732,26 @@
                                 <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                             </div>
                         </div>
+                    </div>
+                );
+            };
+
+            const renderGate = () => {
+                if (shift.isOpen) return null;
+                if (auth.role === 'owner' && activeTab === 'settings') return null;
+                return (
+                    <div className="absolute inset-0 z-40 bg-gray-50 flex flex-col items-center justify-center p-6 animate-fade-in print:hidden">
+                        <div className="w-24 h-24 bg-theme/10 rounded-full flex items-center justify-center mb-6">
+                            <Store className="w-12 h-12 text-theme" />
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-800 mb-2">Kasir Ditutup</h2>
+                        <p className="text-gray-500 text-center text-sm mb-8 max-w-xs">Anda harus membuka shift kasir dan memasukkan modal awal sebelum dapat melakukan transaksi.</p>
+                        <Button className="w-full max-w-xs shadow-xl shadow-theme/30 text-lg py-4 rounded-2xl" onClick={promptBukaShift}>
+                            Buka Shift Sekarang
+                        </Button>
+                        {auth.role === 'owner' && (
+                            <p className="mt-8 text-xs font-bold text-gray-400 cursor-pointer hover:text-theme transition-colors" onClick={() => setActiveTab('settings')}>Masuk ke Pengaturan Aplikasi</p>
+                        )}
                     </div>
                 );
             };
@@ -766,14 +867,26 @@
                     item.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
                     (selectedCategory === 'Semua' || item.category === selectedCategory)
                 );
+                const isOwner = auth.role === 'owner';
 
                 return (
                     <div className="absolute inset-0 flex flex-col animate-smooth-fade">
                         <div className="p-4 bg-white z-10 shadow-sm shrink-0">
-                            <div className="relative mb-3">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                <input type="text" placeholder="Cari pesanan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-gray-50 border border-gray-200 text-sm font-medium rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-theme focus:ring-1 focus:ring-theme transition-colors" />
+                            <div className="relative mb-3 flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                    <input type="text" placeholder="Cari pesanan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-200 text-sm font-medium rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-theme focus:ring-1 focus:ring-theme transition-colors" />
+                                </div>
+                                {isOwner && (
+                                    <button
+                                        onClick={openAddMenuDialog}
+                                        title="Tambah Menu Baru"
+                                        className="shrink-0 w-11 h-11 bg-theme text-white rounded-xl shadow-md shadow-theme/30 flex items-center justify-center active:scale-90 transition-all hover:bg-themeHover"
+                                    >
+                                        <Plus className="w-6 h-6" strokeWidth={3} />
+                                    </button>
+                                )}
                             </div>
                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                 { categories.map(cat => (
@@ -836,6 +949,18 @@
                                 </div>
                             )}
                         </div>
+
+                        {/* FAB Tambah Menu untuk Owner (muncul hanya saat tidak ada cart bar) */}
+                        { isOwner && cartCalculations.totalItems === 0 && (
+                            <button
+                                onClick={openAddMenuDialog}
+                                title="Tambah Menu Baru"
+                                className="absolute bottom-4 right-4 z-30 flex items-center gap-2 bg-theme text-white pl-4 pr-5 py-3.5 rounded-full shadow-2xl shadow-theme/40 active:scale-90 transition-all hover:bg-themeHover animate-popup"
+                            >
+                                <Plus className="w-5 h-5" strokeWidth={3} />
+                                <span className="font-bold text-sm">Tambah Menu</span>
+                            </button>
+                        )}
 
                         { cartCalculations.totalItems > 0 && (
                             <div className="absolute bottom-4 left-0 right-0 px-4 z-20">
@@ -907,7 +1032,6 @@
                                                     <span>{ formatDate(trx.timestamp) }</span>
                                                     <span className="uppercase font-bold bg-gray-100 px-2 py-0.5 rounded-md text-[10px] tracking-widest">{ trx.payment.method }</span>
                                                 </div>
-                                                {/* Grid 3 kolom: Struk, WA, PNG */}
                                                 <div className="grid grid-cols-3 gap-2">
                                                     <Button variant="ghost" className="w-full text-xs py-2 bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100" onClick={() => handlePrintOrJPG(trx)}><Printer className="w-3.5 h-3.5" /> Struk</Button>
                                                     <Button variant="success" className="w-full text-xs py-2" onClick={() => handleShareWA(trx)}><Share2 className="w-3.5 h-3.5" /> WA</Button>
@@ -924,10 +1048,23 @@
             };
 
             const renderSettings = () => {
+                // Proteksi akses: hanya owner
+                if (auth.role !== 'owner') {
+                    return (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 animate-smooth-fade">
+                            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-4">
+                                <Lock className="w-10 h-10 text-red-400" />
+                            </div>
+                            <h2 className="text-xl font-black text-gray-800 mb-2">Akses Ditolak</h2>
+                            <p className="text-sm text-gray-500 text-center max-w-xs">Halaman Pengaturan hanya dapat diakses oleh Owner.</p>
+                        </div>
+                    );
+                }
                 return (
                     <div className="absolute inset-0 flex flex-col animate-smooth-fade">
                         <div className="p-4 border-b border-gray-100 bg-white shrink-0">
                             <h2 className="text-lg font-black text-gray-800">Pengaturan POS</h2>
+                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">Login sebagai: <span className="text-theme">👑 {auth.name}</span></p>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-5 pb-24">
                             
@@ -959,7 +1096,6 @@
                                 </div>
                             </div>
 
-                            {/* ───── KELOLA MENU ──────────────────────────── */}
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-slide-up" style={{ animationDelay: '0.08s' }}>
                                 <div className="p-4 border-b border-gray-50 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
@@ -1025,6 +1161,11 @@
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Logout Button */}
+                            <Button variant="danger" className="w-full mt-2 shadow-sm" onClick={handleLogout}>
+                                <LogOut className="w-4 h-4" /> Logout ({auth.name})
+                            </Button>
                         </div>
                     </div>
                 );
@@ -1218,10 +1359,7 @@
                                             src="./qrisabun.png" 
                                             alt="QRIS Pembayaran" 
                                             className="w-full h-full object-contain"
-                                            onError={(e) => {
-                                                e.target.style.display = 'none';
-                                                console.log('QRIS image not found');
-                                            }}
+                                            onError={(e) => { e.target.style.display = 'none'; }}
                                         />
                                     </div>
                                     <div>
@@ -1253,12 +1391,15 @@
             };
 
             const renderBottomNav = () => {
+                // Karyawan TIDAK mendapat akses ke tab Setelan
                 const navItems = [
                     { id: 'dashboard', label: 'Home', icon: Home },
                     { id: 'pos', label: 'Kasir', icon: LayoutGrid },
                     { id: 'history', label: 'Riwayat', icon: History },
-                    { id: 'settings', label: 'Setelan', icon: Settings },
                 ];
+                if (auth.role === 'owner') {
+                    navItems.push({ id: 'settings', label: 'Setelan', icon: Settings });
+                }
 
                 return (
                     <nav className="shrink-0 bg-white border-t border-gray-200 flex justify-around px-2 py-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] z-30 print:hidden shadow-[0_-4px_10px_rgba(0,0,0,0.02)] relative">
@@ -1282,13 +1423,7 @@
             const renderDialog = () => {
                 if (!dialog) return null;
                 
-                // Dialog Tambah Menu
                 if (dialog.type === 'add_menu') {
-                    const [menuName, setMenuName] = useState('');
-                    const [menuPrice, setMenuPrice] = useState('');
-                    const [menuCategory, setMenuCategory] = useState('Makanan');
-                    const [hasVariant, setHasVariant] = useState(false);
-
                     return (
                         <div className="absolute inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 print:hidden animate-fade-in will-change-transform">
                             <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl animate-popup">
@@ -1298,17 +1433,17 @@
                                 <div className="space-y-4">
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Nama Menu</label>
-                                        <input type="text" value={menuName} onChange={e => setMenuName(e.target.value)}
+                                        <input type="text" value={newMenuForm.name} onChange={e => setNewMenuForm({...newMenuForm, name: e.target.value})}
                                             placeholder="Contoh: Nasi Goreng" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors" autoFocus />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Harga (Rp)</label>
-                                        <input type="number" value={menuPrice} onChange={e => setMenuPrice(e.target.value)}
+                                        <input type="number" value={newMenuForm.price} onChange={e => setNewMenuForm({...newMenuForm, price: e.target.value})}
                                             placeholder="12000" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors" />
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Kategori</label>
-                                        <select value={menuCategory} onChange={e => setMenuCategory(e.target.value)}
+                                        <select value={newMenuForm.category} onChange={e => setNewMenuForm({...newMenuForm, category: e.target.value})}
                                             className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-theme transition-colors">
                                             <option value="Makanan">Makanan</option>
                                             <option value="Minuman">Minuman</option>
@@ -1316,7 +1451,7 @@
                                     </div>
                                     <div className="flex items-center gap-3 py-2">
                                         <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={hasVariant} onChange={(e) => setHasVariant(e.target.checked)} className="sr-only peer" />
+                                            <input type="checkbox" checked={newMenuForm.hasVariant} onChange={(e) => setNewMenuForm({...newMenuForm, hasVariant: e.target.checked})} className="sr-only peer" />
                                             <div className="w-9 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-theme/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-theme"></div>
                                         </label>
                                         <span className="text-sm font-bold text-gray-700">Varian Suhu (Ice/Hot)</span>
@@ -1324,7 +1459,7 @@
                                 </div>
                                 <div className="flex gap-3 mt-6">
                                     <Button variant="ghost" className="flex-1 bg-gray-100" onClick={() => setDialog(null)}>Batal</Button>
-                                    <Button variant="primary" className="flex-1" onClick={() => addCustomMenuItem({ name: menuName, price: menuPrice, category: menuCategory, hasVariant })}>
+                                    <Button variant="primary" className="flex-1" onClick={addCustomMenuItem}>
                                         Simpan
                                     </Button>
                                 </div>
@@ -1469,7 +1604,7 @@
 
             const renderReceiptElement = () => {
                 if (!receiptData) return null;
-                const { id, timestamp, cart, orderInfo, calculations, payment, cashier } = receiptData;
+                const { id, timestamp, cart, orderInfo, calculations, payment } = receiptData;
 
                 return (
                     <>
@@ -1570,69 +1705,103 @@
                 );
             };
 
+            // ─── RENDER ROOT ─────────────────────────────────────────────
             return (
                 <div className="w-full h-full relative flex flex-col overflow-hidden font-sans text-gray-800 bg-gray-50 transition-colors duration-500">
                     { renderSplashScreen() }
-                    { renderGate() }
 
-                    <header className="bg-theme text-white p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative transition-colors duration-500">
-                        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
-                        
-                        <div className="flex items-center gap-3 relative z-10">
-                            <HeaderLogo />
-                            <div className="flex flex-col">
-                                <h1 className="text-lg font-black tracking-wide leading-tight drop-shadow-sm">{ storeConfig.appName }</h1>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="text-[10px] font-medium bg-black/20 px-2 py-0.5 rounded-md shadow-sm border border-white/10 flex items-center gap-1">
-                                        <Clock className="w-3 h-3 opacity-80" />
-                                        { currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }
-                                    </span>
-                                    <span className="text-[10px] font-bold bg-black/20 px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1.5 border border-white/10">
-                                        <span className={`w-2 h-2 rounded-full ${shift.isOpen ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
-                                        { shift.isOpen ? 'Buka' : 'Tutup' }
-                                    </span>
+                    { !auth.isLoggedIn ? (
+                        renderLogin()
+                    ) : (
+                        <>
+                            { renderGate() }
+
+                            <header className="bg-theme text-white p-4 pt-[max(env(safe-area-inset-top),1rem)] flex justify-between items-center z-20 shrink-0 print:hidden relative transition-colors duration-500">
+                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px', pointerEvents: 'none' }}></div>
+                                
+                                <div className="flex items-center gap-3 relative z-10">
+                                    <HeaderLogo />
+                                    <div className="flex flex-col">
+                                        <h1 className="text-lg font-black tracking-wide leading-tight drop-shadow-sm">{ storeConfig.appName }</h1>
+                                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                            <span className="text-[10px] font-medium bg-black/20 px-2 py-0.5 rounded-md shadow-sm border border-white/10 flex items-center gap-1">
+                                                <Clock className="w-3 h-3 opacity-80" />
+                                                { currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }
+                                            </span>
+                                            <span className="text-[10px] font-bold bg-black/20 px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1.5 border border-white/10">
+                                                <span className={`w-2 h-2 rounded-full ${shift.isOpen ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></span>
+                                                { shift.isOpen ? 'Buka' : 'Tutup' }
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
 
-                        <div className="relative z-20 overflow-visible">
-                            <button onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition-colors relative z-10 border border-white/10">
-                                <MoreVertical className="w-5 h-5" />
-                            </button>
-                            { isHeaderMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100 py-1 text-gray-800 animate-slide-up origin-top-right z-50">
-                                    <button onClick={handleResetApp} className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 flex items-center gap-2 text-red-600 font-bold transition-colors">
-                                        <AlertCircle className="w-4 h-4" /> Reset Data Aplikasi
+                                <div className="relative z-20 overflow-visible flex items-center gap-2">
+                                    <div className="hidden xs:flex items-center gap-1 bg-white/10 px-2.5 py-1.5 rounded-full border border-white/10">
+                                        { auth.role === 'owner' ? <Crown className="w-3.5 h-3.5 text-yellow-300" /> : <UserCircle className="w-3.5 h-3.5" /> }
+                                        <span className="text-[10px] font-bold">{ auth.name }</span>
+                                    </div>
+                                    <button onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 active:scale-95 transition-colors relative z-10 border border-white/10">
+                                        <MoreVertical className="w-5 h-5" />
                                     </button>
-                                    <div className="border-b border-gray-100"></div>
-                                    <button onClick={() => window.location.reload()} className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-bold transition-colors">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                        Muat Ulang Paksa
-                                    </button>
+                                    { isHeaderMenuOpen && (
+                                        <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100 py-1 text-gray-800 animate-slide-up origin-top-right z-50">
+                                            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${auth.role === 'owner' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                        { auth.role === 'owner' ? <Crown className="w-4 h-4" /> : <UserCircle className="w-4 h-4" /> }
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-black text-gray-800">{ auth.name }</p>
+                                                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{ auth.role }</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {auth.role === 'owner' && (
+                                                <>
+                                                    <button onClick={() => { setActiveTab('settings'); setIsHeaderMenuOpen(false); }} className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-bold transition-colors">
+                                                        <Settings className="w-4 h-4" /> Pengaturan
+                                                    </button>
+                                                    <div className="border-b border-gray-100"></div>
+                                                    <button onClick={handleResetApp} className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 flex items-center gap-2 text-red-600 font-bold transition-colors">
+                                                        <AlertCircle className="w-4 h-4" /> Reset Data Aplikasi
+                                                    </button>
+                                                </>
+                                            )}
+                                            <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-sm hover:bg-red-50 flex items-center gap-2 text-red-600 font-bold transition-colors">
+                                                <LogOut className="w-4 h-4" /> Logout
+                                            </button>
+                                            <div className="border-b border-gray-100"></div>
+                                            <button onClick={() => window.location.reload()} className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700 font-bold transition-colors">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                                Muat Ulang Paksa
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </header>
+                            </header>
 
-                    <main className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 print:hidden" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
-                        { activeTab === 'dashboard' && renderDashboard() }
-                        { activeTab === 'pos' && renderPOS() }
-                        { activeTab === 'history' && renderHistory() }
-                        { activeTab === 'settings' && renderSettings() }
-                    </main>
+                            <main className="flex-1 relative overflow-hidden flex flex-col bg-gray-50 print:hidden" onClick={() => isHeaderMenuOpen && setIsHeaderMenuOpen(false)}>
+                                { activeTab === 'dashboard' && renderDashboard() }
+                                { activeTab === 'pos' && renderPOS() }
+                                { activeTab === 'history' && renderHistory() }
+                                { activeTab === 'settings' && auth.role === 'owner' && renderSettings() }
+                            </main>
 
-                    { !isCartOpen && !isCheckoutOpen && renderBottomNav() }
+                            { !isCartOpen && !isCheckoutOpen && renderBottomNav() }
 
-                    { renderAddonModal() }
-                    { renderCart() }
-                    { renderCheckout() }
-                    { renderDialog() }
+                            { renderAddonModal() }
+                            { renderCart() }
+                            { renderCheckout() }
+                            { renderDialog() }
 
-                    <div className="absolute top-20 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none print:hidden px-4">
+                            { renderReceiptElement() }
+                        </>
+                    )}
+
+                    <div className="absolute top-20 left-0 right-0 z-[300] flex flex-col items-center gap-2 pointer-events-none print:hidden px-4">
                         { toasts.map(toast => <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />) }
                     </div>
-
-                    { renderReceiptElement() }
                 </div>
             );
         }
